@@ -1,18 +1,27 @@
 #pragma once
 #include <iostream>
+#include <vector>
 #include "grid.hpp"
+#include "params.hpp"
 
 class Multigrid {
 public:
+    Params p;
 
-    Grid g;  
+    // set of grids 
+    std::vector<Grid> grids;
 
-    Multigrid() { 
-        std::cout << "Hello from Multigrid!\n"; 
-    }
+    // constructor
+    Multigrid();
 
-    void vcycle() { 
-        std::cout << "Performing a dummy V-cycle\n"; 
-    }
+    void init();
+
+    // member functions
+    void vcycle();
+
+    // save data 
+    void save_data();
+
+    // hello world
+    void hello();
 };
-

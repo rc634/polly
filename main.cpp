@@ -8,10 +8,12 @@ int main() {
 
     Multigrid mg;
 
-    mg.vcycle();
+    mg.init();
 
-    std::cout << "Hello from main!\n";
-    
+    mg.hello();
+
+    mg.save_data();
+
     return 0;
 }
 
