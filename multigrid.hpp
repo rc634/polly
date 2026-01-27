@@ -29,6 +29,12 @@ public:
     // set field data pre-solve
     void initial_data();
 
+    // flush data down from fine level to coarse and back up to fine again
+    void flush();
+
+    // flush data down from fine level to coarse and back up to fine again
+    void v_cycle();
+
     // hello world
     void hello();
 

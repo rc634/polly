@@ -17,7 +17,10 @@ void Field::init(int i) {
     ng = p.ng;
     nxg = nx + 2*ng;
     nyg = ny + 2*ng;
+
+    // data arrays
     data.resize(nxg*nyg,0.0);
+    data_new.resize(nxg*nyg,0.0);
 
     // indices 
     imin = ng;
@@ -79,4 +82,25 @@ void Field::set_data(double val, int i, int j) {
 
 void Field::hello() {
     std::cout << "Hello from Field : " << nxg << " x " << nyg << "\n";
+}
+
+// calculus 
+double Field::d1x(int i, int j) {
+    return 0.;
+}
+
+double Field::d1y(int i, int j) {
+    return 0.;
+}
+
+double Field::d2x(int i, int j) {
+    return 0.;
+}
+
+double Field::d2y(int i, int j) {
+    return 0.;
+}
+
+double Field::cartesian_laplacian(int i, int j) {
+    return d2x(i,j) + d2y(i,j);
 }

@@ -27,6 +27,17 @@ void Grid::ID_gaussian(double x0, double y0, double sig) {
 
 
 
+void Grid::relax() {
+    for (int j = f1.jmin; j < f1.jmax; j++) {
+        for (int i = f1.imin; i < f1.imax; i++) {
+            // set data 
+            f1.set_data(0.9*f1.get_data(i,j),i,j);
+        }
+    }
+}
+
+
+
 void Grid::save_data() {
     std::string filename = "data/f.dat";
     std::ofstream file(filename);
@@ -47,7 +58,11 @@ void Grid::save_data() {
     // including ghost cells for now 
     for (int j = 0; j < f1.nyg; j++) {
         for (int i = 0; i < f1.nxg; i++) {
-            file << f1.get_data(i,j) << ",";
+            file << f1.get_data(i,j) ;
+            if (i==f1.nxg-1) {
+                break;
+            }
+            file << ",";
         }
         file << "\n";
     }

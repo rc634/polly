@@ -21,6 +21,9 @@ public:
 
     void ID_gaussian(double x0, double y0, double sig);
 
+    // parabolic diffusion type relaxation
+    void relax();
+
     // save data 
     void save_data();
 

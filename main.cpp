@@ -12,6 +12,12 @@ int main() {
 
     mg.hello();
 
+    mg.v_cycle();
+    mg.v_cycle();
+    mg.v_cycle();
+    mg.v_cycle();
+    mg.v_cycle();
+
     mg.save_data();
 
     return 0;

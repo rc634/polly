@@ -28,16 +28,45 @@ void Multigrid::initial_data() {
     double sig = 0.1;
     fine_grid_ptr->ID_gaussian(x0,y0,sig);
 
+    flush();
+}
+
+void Multigrid::flush() {
+    // Restriction 
+
     // loop down over grids to set initial data on all levels
     for (int i = p.num_grids-1; i>= 1; i--)
     {
         restrict_down(grids[i],grids[i-1]);
     }
-    // // loop up over grids to set initial data on all levels
-    // for (int i = 0; i < p.num_grids-1; i++)
-    // {
-    //     prolongate_up(grids[i],grids[i+1]);
-    // }
+
+    // Prolongation 
+
+    // loop up over grids to set initial data on all levels
+    for (int i = 0; i < p.num_grids-1; i++)
+    {
+        prolongate_up(grids[i],grids[i+1]);
+    }
+}
+
+void Multigrid::v_cycle() {
+    // Restriction 
+
+    // loop down over grids to set initial data on all levels
+    for (int i = p.num_grids-1; i>= 1; i--)
+    {
+        grids[i].relax();
+        restrict_down(grids[i],grids[i-1]);
+    }
+
+    // Prolongation 
+
+    // loop up over grids to set initial data on all levels
+    for (int i = 0; i < p.num_grids-1; i++)
+    {
+        grids[i].relax();
+        prolongate_up(grids[i],grids[i+1]);
+    }
 }
 
 void Multigrid::save_data() {

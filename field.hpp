@@ -35,6 +35,7 @@ public:
     int ng;
 
     std::vector<double> data; // flattened 2D array
+    std::vector<double> data_new; // flattened 2D array
 
     Field();
 
@@ -54,4 +55,11 @@ public:
     inline int index(int i, int j) const;
 
     void hello();
+
+    // default 4th order differential operators
+    double d1x(int i, int j);
+    double d1y(int i, int j);
+    double d2x(int i, int j);
+    double d2y(int i, int j);
+    double cartesian_laplacian(int i, int j);
 };
