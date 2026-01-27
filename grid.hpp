@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include "field.hpp"
+#include "params.hpp"
 
 class Grid {
 public:
@@ -17,6 +18,8 @@ public:
     Grid();
 
     void init(int i);
+
+    void ID_gaussian(double x0, double y0, double sig);
 
     // save data 
     void save_data();

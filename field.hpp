@@ -11,16 +11,28 @@ public:
     // grid number (heirarchy)
     int grid_n; // 0 minimum
 
-    // physical problem size 
+    // gridpoints
     int nx;
     int ny;
+    double dx;
+    double dy;
+
+    // physical sizes including ghosts
+    double xL, xU, yL, yU;
 
     // numerical problem size 
     int nxg;
     int nyg;
 
-    // ghosts 
-    int ng = p.ng;
+    // used for looping physics 
+    // for (i = imin; i < imax; i++ )...
+    int imin;
+    int imax;
+    int jmin;
+    int jmax;
+
+    // ghost layers (e.g. per side)
+    int ng;
 
     std::vector<double> data; // flattened 2D array
 
@@ -30,10 +42,16 @@ public:
 
     void set_data(double val, int i, int j);
 
-    double get_data(int i, int j);
+    double get_data(int i, int j) const;
+
+    double bilinear_interp_xy(double x, double y) const;
+
+    double get_x(int i, int j) const;
+
+    double get_y(int i, int j) const;
 
     // index getter
-    inline int index(int i, int j);
+    inline int index(int i, int j) const;
 
     void hello();
 };
