@@ -2,6 +2,7 @@
 #include <string>
 #include "grid.hpp"
 #include <iomanip> // for precision output
+#include <algorithm> // for std::min
 
 
 Grid::Grid() {
@@ -10,6 +11,8 @@ Grid::Grid() {
 void Grid::init(int i) {
     grid_n = i;
     f1.init(grid_n);
+    // courant friendly timestep
+    m_dt = p.CFL*std::min(f1.dx,f1.dy);
 }
 
 void Grid::ID_gaussian(double x0, double y0, double sig) {
@@ -33,8 +36,15 @@ void Grid::relax() {
     // loop over all live cells 
     for (int j = f1.jmin; j < f1.jmax; j++) {
         for (int i = f1.imin; i < f1.imax; i++) {
-            // set data
-            double new_f1 = 0.9*f1.get_data(i,j);
+            // time evolution step
+
+            // laplacian is zero WARNING!
+            double df1_dt = f1.cartesian_laplacian(i,j);
+
+            // tiemstep f_new = dt * df/dt + f
+            double new_f1 = df1_dt * m_dt + f1.get_data(i,j);
+
+            // set new-data stage 
             f1.set_new_data(new_f1,i,j);
         }
     }

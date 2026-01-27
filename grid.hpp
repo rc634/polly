@@ -18,6 +18,9 @@ public:
     // params
     Params p;
 
+    // the effective timestep
+    double m_dt;
+
     Grid();
 
     void init(int i);

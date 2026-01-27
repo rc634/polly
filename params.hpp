@@ -11,6 +11,9 @@ struct Params {
     // number of 4th order stencil steps to do near end for fine resolution?
     double smooth_steps = 100; 
 
+    // lewey friedrich stabiilty thingy 
+    double CFL = 0.25;
+
     // physical boundaries, upper lower
     double xL = 0.;
     double xU = 1.;
