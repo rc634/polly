@@ -14,9 +14,6 @@ int main() {
 
     mg.v_cycle();
     mg.v_cycle();
-    mg.v_cycle();
-    mg.v_cycle();
-    mg.v_cycle();
 
     mg.save_data();
 

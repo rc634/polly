@@ -20,9 +20,6 @@ public:
 
     void init();
 
-    // member functions
-    void vcycle();
-
     // save data 
     void save_data();
 

@@ -15,6 +15,9 @@ public:
     // place in heirarchy
     int grid_n; 
 
+    // params
+    Params p;
+
     Grid();
 
     void init(int i);

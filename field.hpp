@@ -23,6 +23,7 @@ public:
     // numerical problem size 
     int nxg;
     int nyg;
+    int n_flat;
 
     // used for looping physics 
     // for (i = imin; i < imax; i++ )...
@@ -42,6 +43,10 @@ public:
     void init(int i);
 
     void set_data(double val, int i, int j);
+
+    void set_new_data(double val, int i, int j);
+
+    void save_new_data();
 
     double get_data(int i, int j) const;
 

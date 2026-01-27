@@ -28,12 +28,22 @@ void Grid::ID_gaussian(double x0, double y0, double sig) {
 
 
 void Grid::relax() {
+    // One Relaxation step 
+    
+    // loop over all live cells 
     for (int j = f1.jmin; j < f1.jmax; j++) {
         for (int i = f1.imin; i < f1.imax; i++) {
-            // set data 
-            f1.set_data(0.9*f1.get_data(i,j),i,j);
+            // set data
+            double new_f1 = 0.9*f1.get_data(i,j);
+            f1.set_new_data(new_f1,i,j);
         }
     }
+
+    // Save over the old data - 
+    // - with the finished new data
+    f1.save_new_data();
+
+    // fill all ghosts here ?
 }
 
 
@@ -50,7 +60,7 @@ void Grid::save_data() {
     std::cout << "Saving " << filename << std::endl;
 
     // 8 significant figures (not 8 decimal places!)
-    file << std::scientific << std::setprecision(1);
+    file << std::scientific << std::setprecision(p.save_precision);
 
     // auto f_ = f1; // lazy 
 

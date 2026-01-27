@@ -17,10 +17,12 @@ void Field::init(int i) {
     ng = p.ng;
     nxg = nx + 2*ng;
     nyg = ny + 2*ng;
+    // flattened array index
+    n_flat = nxg*nyg;
 
     // data arrays
-    data.resize(nxg*nyg,0.0);
-    data_new.resize(nxg*nyg,0.0);
+    data.resize(n_flat,0.0);
+    data_new.resize(n_flat,0.0);
 
     // indices 
     imin = ng;
@@ -78,6 +80,18 @@ double Field::bilinear_interp_xy(double x, double y) const {
 
 void Field::set_data(double val, int i, int j) {
     data[i + nxg * j] = val;
+}
+
+void Field::set_new_data(double val, int i, int j) {
+    data_new[i + nxg * j] = val;
+}
+
+void Field::save_new_data(){
+    // loop all cells including ghosts
+    // flattened array type loop
+    for (int k = 0; k < n_flat; k++) {
+        data[k] = data_new[k];
+    }
 }
 
 void Field::hello() {

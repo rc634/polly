@@ -18,10 +18,6 @@ void Multigrid::init() {
     initial_data();
 }
 
-void Multigrid::vcycle() {
-    std::cout << "Performing a dummy V-cycle\n";
-}
-
 void Multigrid::initial_data() {
     double x0 = 0.2;
     double y0 = 0.3;
