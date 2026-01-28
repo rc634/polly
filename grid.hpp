@@ -21,16 +21,25 @@ public:
     // the effective timestep
     double m_dt;
 
+    // error or delta 
+    double m_delta;
+
     Grid();
 
     void init(int i);
 
     void ID_gaussian(double x0, double y0, double sig);
 
+    void ID_pdisc(double R, double density);
+
     double L2norm();
+
+    double field_integral();
 
     // parabolic diffusion type relaxation
     void relax();
+
+    void fill_all_ghosts();
 
     // save data 
     void save_data();

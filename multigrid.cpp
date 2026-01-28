@@ -16,13 +16,24 @@ void Multigrid::init() {
 
     // set initial data on field
     initial_data();
+    fill_all_ghosts();
+}
+
+void Multigrid::fill_all_ghosts() {
+    for (int i = 0; i < p.num_grids; i++)
+    {
+        grids[i].fill_all_ghosts();
+    }
 }
 
 void Multigrid::initial_data() {
     double x0 = 0.2;
     double y0 = 0.3;
     double sig = 0.1;
-    fine_grid_ptr->ID_gaussian(x0,y0,sig);
+    // std::cout << "Setting Poisson Disc initial data !\n";
+    // fine_grid_ptr->ID_pdisc(0.1,100); // R_0, rho_0, radius, density 
+    // std::cout << "Setting Gaussian initial data !\n";
+    // fine_grid_ptr->ID_gaussian(x0,y0,sig);
 
     //flush();
 }
@@ -45,6 +56,7 @@ void Multigrid::flush() {
         prolongate_up(grids[i],grids[i+1]);
     }
 }
+
 
 void Multigrid::v_cycle() {
     // Restriction 

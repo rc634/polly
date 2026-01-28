@@ -2,7 +2,7 @@
 #pragma once
 
 struct Params {
-    int num_grids = 4;       // grids [0, num_grids-1]
+    int num_grids = 6;       // grids [0, num_grids-1]
     int nx = 32;             // grid points in x on coarsest level
     int ny = 32;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
@@ -22,5 +22,9 @@ struct Params {
     double yU = 1.;
 
     // data saving
-    int save_precision = 8;
+    int save_precision = 16;
 };
+
+// notes 
+
+// convergence ..

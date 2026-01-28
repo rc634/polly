@@ -1,11 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
 # load the data (comma-separated)
 data = np.loadtxt("../data/f.dat", delimiter=",")
 data2 = np.loadtxt("../data/g.dat", delimiter=",")
 
-plt.imshow(data-data2, origin="lower", aspect="auto")
+# norm = Normalize(vmin=-5, vmax=0.)
+
+plt.imshow(np.log10(np.abs(data-data2)), origin="lower", aspect="auto")#, norm=norm)
+# plt.imshow(data-data2, origin="lower", aspect="auto", norm=norm)
 plt.colorbar(label="Value")
 plt.xlabel("Column index")
 plt.ylabel("Row index")

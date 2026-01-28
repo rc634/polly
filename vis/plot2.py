@@ -6,7 +6,7 @@ from matplotlib.colors import Normalize
 data  = np.loadtxt("../data/f.dat", delimiter=",")
 data2 = np.loadtxt("../data/g.dat", delimiter=",")
 
-norm = Normalize(vmin=0.0, vmax=1.0)
+norm = Normalize(vmin=-0.5, vmax=0.)
 
 fig, axes = plt.subplots(
     2, 1,

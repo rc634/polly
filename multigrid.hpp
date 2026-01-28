@@ -26,6 +26,9 @@ public:
     // set field data pre-solve
     void initial_data();
 
+    // fill ghosts 
+    void fill_all_ghosts();
+
     // flush data down from fine level to coarse and back up to fine again
     void flush();
 

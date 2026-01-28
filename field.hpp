@@ -40,6 +40,8 @@ public:
 
     Field();
 
+    void hello();
+
     void init(int i);
 
     void set_data(double val, int i, int j);
@@ -48,23 +50,33 @@ public:
 
     void save_new_data();
 
-    double get_data(int i, int j) const;
+    // getters 
 
-    double bilinear_interp_xy(double x, double y) const;
+    double get_new_data(int i, int j);
+
+    double get_data(int i, int j) const;
 
     double get_x(int i, int j) const;
 
     double get_y(int i, int j) const;
 
-    // index getter
     inline int index(int i, int j) const;
 
-    void hello();
+    // bilinear interpolator
 
-    // default 4th order differential operators
+    double bilinear_interp_xy(double x, double y) const;
+
+    // L2 norm new - old data
+
+    double delta_data();
+
+    // differential operators
+
     double d1x(int i, int j);
     double d1y(int i, int j);
     double d2x(int i, int j);
     double d2y(int i, int j);
     double cartesian_laplacian(int i, int j);
+    double cylindrical_laplacian(int i, int j, double r);
+    double cylindrical_laplacian_bad(int i, int j, double r);
 };

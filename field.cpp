@@ -87,6 +87,20 @@ void Field::set_new_data(double val, int i, int j) {
     data_new[i + nxg * j] = val;
 }
 
+double Field::get_new_data(int i, int j) {
+    return data_new[i + nxg * j];
+}
+
+double Field::delta_data() {
+    // loop all cells including ghosts
+    // flattened array type loop
+    double out = 0.0;
+    for (int k = 0; k < n_flat; k++) {
+        out += pow(data[k] - data_new[k],2);
+    }
+    return out;
+}
+
 void Field::save_new_data(){
     // loop all cells including ghosts
     // flattened array type loop
@@ -101,11 +115,31 @@ void Field::hello() {
 
 // calculus 
 double Field::d1x(int i, int j) {
-    return 0.;
+    // stencil loading 
+    const auto& stencil = fd::d1_central_2;
+
+    // perform stencil deriv
+    double deriv = 0.0;
+    for (std::size_t k = 0; k < stencil.offset.size(); k++) {
+        // create flattened index 
+        int m = index(i + stencil.offset[k],j);
+        deriv += stencil.coeff[k] * data[m];
+    }
+    return deriv / dx;
 }
 
 double Field::d1y(int i, int j) {
-    return 0.;
+    // stencil loading 
+    const auto& stencil = fd::d1_central_2;
+
+    // perform stencil deriv
+    double deriv = 0.0;
+    for (std::size_t k = 0; k < stencil.offset.size(); k++) {
+        // create flattened index 
+        int m = index(i,j + stencil.offset[k]);
+        deriv += stencil.coeff[k] * data[m];
+    }
+    return deriv / dy;
 }
 
 double Field::d2x(int i, int j) {
@@ -138,4 +172,12 @@ double Field::d2y(int i, int j) {
 
 double Field::cartesian_laplacian(int i, int j) {
     return d2x(i,j) + d2y(i,j);
+}
+
+double Field::cylindrical_laplacian(int i, int j, double r) {
+    return d2x(i,j) + d2y(i,j) + d1x(i,j)/r;
+}
+
+double Field::cylindrical_laplacian_bad(int i, int j, double x) {
+    return d2x(i,j) + d2y(i,j) + d1x(i,j)/x;
 }
