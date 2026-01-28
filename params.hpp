@@ -2,7 +2,7 @@
 #pragma once
 
 struct Params {
-    int num_grids = 4;       // number of levels in the multigrid hierarchy, min 1
+    int num_grids = 4;       // grids [0, num_grids-1]
     int nx = 32;             // grid points in x on coarsest level
     int ny = 32;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
@@ -10,6 +10,7 @@ struct Params {
     
     // number of 4th order stencil steps to do near end for fine resolution?
     double smooth_steps = 100; 
+    double iter = 3; // relaxation steps after/before prolongation/restriction
 
     // lewey friedrich stabiilty thingy 
     double CFL = 0.25;
@@ -21,5 +22,5 @@ struct Params {
     double yU = 1.;
 
     // data saving
-    int save_precision = 3;
+    int save_precision = 8;
 };

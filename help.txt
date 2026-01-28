@@ -1,0 +1,11 @@
+####################
+# Helpful stuff 
+
+####################
+# gnuplot output
+
+set datafile separator ","  # if CSV uses commas
+set view map               # 2D heatmap view
+set palette rgb 33,13,10   # color palette
+splot "data/f.dat" matrix with image
+

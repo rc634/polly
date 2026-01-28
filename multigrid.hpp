@@ -32,6 +32,9 @@ public:
     // flush data down from fine level to coarse and back up to fine again
     void v_cycle();
 
+    // single relax step of fine grid
+    void refine();
+
     // hello world
     void hello();
 

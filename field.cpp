@@ -1,4 +1,5 @@
 #include "field.hpp"
+#include "stencils.hpp"
 
 
 Field::Field() {
@@ -108,11 +109,31 @@ double Field::d1y(int i, int j) {
 }
 
 double Field::d2x(int i, int j) {
-    return 0.;
+    // stencil loading 
+    const auto& stencil = fd::d2_central_2;
+
+    // perform stencil deriv
+    double deriv = 0.0;
+    for (std::size_t k = 0; k < stencil.offset.size(); k++) {
+        // create flattened index 
+        int m = index(i + stencil.offset[k],j);
+        deriv += stencil.coeff[k] * data[m];
+    }
+    return deriv / (dx * dx);
 }
 
 double Field::d2y(int i, int j) {
-    return 0.;
+    // stencil loading 
+    const auto& stencil = fd::d2_central_2;
+
+    // perform stencil deriv
+    double deriv = 0.0;
+    for (std::size_t k = 0; k < stencil.offset.size(); k++) {
+        // create flattened index 
+        int m = index(i,j + stencil.offset[k]);
+        deriv += stencil.coeff[k] * data[m];
+    }
+    return deriv / (dy * dy);
 }
 
 double Field::cartesian_laplacian(int i, int j) {

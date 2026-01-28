@@ -24,9 +24,10 @@ void Multigrid::initial_data() {
     double sig = 0.1;
     fine_grid_ptr->ID_gaussian(x0,y0,sig);
 
-    flush();
+    //flush();
 }
 
+// for testing only, can cause large errors
 void Multigrid::flush() {
     // Restriction 
 
@@ -51,7 +52,12 @@ void Multigrid::v_cycle() {
     // loop down over grids to set initial data on all levels
     for (int i = p.num_grids-1; i>= 1; i--)
     {
-        grids[i].relax();
+        //std::cout << "Relax grid " << i << "\n"; 
+        for (int q = 0; q<p.iter; q++)
+        {
+            grids[i].relax();
+        }
+        //std::cout << "Restrict " << i << " to " << i-1 <<"\n";
         restrict_down(grids[i],grids[i-1]);
     }
 
@@ -60,9 +66,27 @@ void Multigrid::v_cycle() {
     // loop up over grids to set initial data on all levels
     for (int i = 0; i < p.num_grids-1; i++)
     {
-        grids[i].relax();
+        //std::cout << "Relax grid " << i << "\n"; 
+        for (int q = 0; q<p.iter; q++)
+        {
+            grids[i].relax();
+        }
+        //std::cout << "Prolong " << i << " to " << i+1 <<"\n";
         prolongate_up(grids[i],grids[i+1]);
     }
+
+    //std::cout << "Fine level relax\n"; 
+    // final smoothing
+    for (int q = 0; q<p.iter; q++)
+    {
+        fine_grid_ptr->relax();
+    }
+}
+
+void Multigrid::refine() {
+    // Restriction 
+
+    fine_grid_ptr->relax();
 }
 
 void Multigrid::save_data() {
