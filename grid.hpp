@@ -30,6 +30,8 @@ public:
 
     void ID_gaussian(double x0, double y0, double sig);
 
+    void ID_zeros();
+
     void ID_pdisc(double R, double density);
 
     double L2norm();
@@ -42,7 +44,7 @@ public:
     void fill_all_ghosts();
 
     // save data 
-    void save_data();
+    void save_data(const std::string& filename);
 
     void hello();
 };

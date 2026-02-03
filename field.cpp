@@ -101,11 +101,38 @@ double Field::delta_data() {
     return out;
 }
 
-void Field::save_new_data(){
+void Field::save_new_data() {
     // loop all cells including ghosts
     // flattened array type loop
     for (int k = 0; k < n_flat; k++) {
         data[k] = data_new[k];
+    }
+}
+
+// copy ghosts from old data to new data 
+void Field::copy_old_ghosts_to_new() {
+    // two ghosts thickness hard coded!
+
+    // loop left boundary
+    for (int j = 0; j < nyg; j++) {
+        set_new_data(get_data(0,j),0,j);
+        set_new_data(get_data(1,j),1,j);
+    }
+  
+    // loop right boundary
+    for (int j = 0; j < nyg; j++) {
+        set_new_data(get_data(nxg-2,j), nxg-2, j);
+        set_new_data(get_data(nxg-1,j), nxg-1, j);
+    }
+    // loop top boundary
+    for (int i = 0; i < nxg; i++) {
+        set_new_data(get_data(i,nyg-2), i, nyg-2);
+        set_new_data(get_data(i,nyg-1), i, nyg-1);
+    }
+    // loop bottom boundary
+    for (int i = 0; i < nxg; i++) {
+        set_new_data(get_data(i,1), i,1);
+        set_new_data(get_data(i,0), i,0);
     }
 }
 
@@ -174,8 +201,13 @@ double Field::cartesian_laplacian(int i, int j) {
     return d2x(i,j) + d2y(i,j);
 }
 
-double Field::cylindrical_laplacian(int i, int j, double r) {
-    return d2x(i,j) + d2y(i,j) + d1x(i,j)/r;
+double Field::cylindrical_laplacian(int i, int j, double x) {
+    double lap_y = d2y(i,j); // cartesian like z coord
+    double f0 = get_data(i-1,j);
+    double f1 = get_data(i,j);
+    double f2 = get_data(i+1,j);
+    double lap_x_curvilinear = ((x+0.5*dx)*(f2-f1) - (x-0.5*dx)*(f1-f0))/(x*dx*dx);
+    return lap_y + lap_x_curvilinear;
 }
 
 double Field::cylindrical_laplacian_bad(int i, int j, double x) {

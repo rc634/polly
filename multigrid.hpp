@@ -15,16 +15,22 @@ public:
     Grid* fine_grid_ptr;
     Grid* coarse_grid_ptr;
 
+    // info about grids 
+    int i_fine, i_coarse; // integers to index fine and coarse grids
+
     // constructor
     Multigrid();
 
     void init();
 
     // save data 
-    void save_data();
+    void save_data(const std::string& filename);
 
     // set field data pre-solve
     void initial_data();
+
+    // set field data pre-solve
+    void analytic_solution();
 
     // fill ghosts 
     void fill_all_ghosts();
@@ -33,7 +39,10 @@ public:
     void flush();
 
     // flush data down from fine level to coarse and back up to fine again
-    void v_cycle();
+    void v_cycle(int i_top, int i_bot);
+
+    // flush data down from fine level to coarse and back up to fine again
+    void w_cycle();
 
     // single relax step of fine grid
     void refine();

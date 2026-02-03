@@ -3,62 +3,95 @@
 #include "grid.hpp"
 #include "multigrid.hpp"
 #include "problem.hpp"
+#include <cmath>
+
 
 int main() {
 
     Multigrid mg;
 
-    double old_L2;
-    double new_L2;
+    double old_delta;
+    double new_delta;
+    double old_integral;
 
     mg.init();
-
     mg.hello();
 
-    for (int n=1; n<=2000; n++) {
-        // lets goooooo!
+    // v cycle controlls 
+    int i_top = mg.i_fine;
+    int i_bot = mg.i_coarse;
+    int n_trigger = 200;
 
-        mg.v_cycle();
+    // first measure the analytic solution for convergence testing
+    mg.analytic_solution();
+    mg.save_data("g");
 
-        new_L2 = mg.fine_grid_ptr->L2norm();
+    // set zeros for the solver to start from
+    mg.initial_data();
 
-        if (n%100==0)
-        {
-            std::cout << ">- VCYCLE " << n << " : ";
-            //std::cout << "L2 norm " << new_L2;
-            std::cout << "integral " << mg.fine_grid_ptr->field_integral();
-            std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
-            // std::cout << " : remainder " << new_L2-old_L2 << "\n";
+    
+
+    // for (int n=1; n<=20000; n++) {
+    //     // lets goooooo!
+
+    //     mg.v_cycle(i_top,i_bot);
+    //     //mg.w_cycle();
+
+    //     new_delta = mg.fine_grid_ptr->m_delta;
+
+    //     if (n%100==0)
+    //     {
+    //         std::cout << ">- VCYCLE " << n << " : ";
+    //         std::cout << "integral " << mg.fine_grid_ptr->field_integral();
+    //         std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
+    //         std::cout << " : d-delta " << new_delta-old_delta << "\n";
+    //     }
+
+    //     if (n%n_trigger==0 && abs(new_delta-old_delta)<10e-18) {
+    //         std::cout << "#################\n";
+    //         std::cout << "# Dropping grid "<< i_bot << "!\n";
+    //         std::cout << "#################\n";
+    //         i_bot += 1;
+    //         // stop v-cycling if we have one level left
+    //         if (i_top == i_bot) break;
+    //     }
+        
+    //     old_delta = new_delta;
+    // }
+
+    for (int n=1; n<=50; n++) {
+        mg.w_cycle();
+        std::cout << ">- WCYCLE " << n << " : ";
+        std::cout << "integral " << mg.fine_grid_ptr->field_integral();
+        std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
+        std::cout << " : delta integral " 
+                << mg.fine_grid_ptr->field_integral()-old_integral << "\n";
+
+        if (abs(mg.fine_grid_ptr->field_integral()-old_integral)<10e-20) {
+            break;
         }
-
-        
-        
-        old_L2 = new_L2;
+        old_integral = mg.fine_grid_ptr->field_integral();
     }
 
-    for (int n=1; n<=1000; n++) {
+    for (int n=1; n<=200000; n++) {
         // lets goooooo!
 
         mg.refine();
 
-        new_L2 = mg.fine_grid_ptr->L2norm();
+        new_delta = mg.fine_grid_ptr->m_delta;
 
-        if (n%100==0)
+        if (n%10000==0)
         {
-            std::cout << ">- VCYCLE " << n << " : ";
-            //std::cout << "L2 norm " << new_L2;
+            std::cout << ">- REFINEMENT " << n << " : ";
             std::cout << "integral " << mg.fine_grid_ptr->field_integral();
             std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
-            // std::cout << " : remainder " << new_L2-old_L2 << "\n";
+            std::cout << " : d-delta " << new_delta-old_delta << "\n";
         }
 
-        old_L2 = new_L2;
+        old_delta = new_delta;
     }
 
-    // hacked override data with initial data for plotting 
-    // mg.initial_data();
-
-    mg.save_data();
+    mg.save_data("f");
 
     return 0;
 }

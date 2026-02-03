@@ -50,6 +50,8 @@ public:
 
     void save_new_data();
 
+    void copy_old_ghosts_to_new();
+
     // getters 
 
     double get_new_data(int i, int j);
@@ -77,6 +79,6 @@ public:
     double d2x(int i, int j);
     double d2y(int i, int j);
     double cartesian_laplacian(int i, int j);
-    double cylindrical_laplacian(int i, int j, double r);
-    double cylindrical_laplacian_bad(int i, int j, double r);
+    double cylindrical_laplacian(int i, int j, double x);
+    double cylindrical_laplacian_bad(int i, int j, double x);
 };

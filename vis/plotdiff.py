@@ -8,10 +8,11 @@ data2 = np.loadtxt("../data/g.dat", delimiter=",")
 
 # norm = Normalize(vmin=-5, vmax=0.)
 
-plt.imshow(np.log10(np.abs(data-data2)), origin="lower", aspect="auto")#, norm=norm)
+# plt.imshow((((data-data2)/data2)), origin="lower", aspect="auto")#, norm=norm)
+plt.imshow(np.log10(np.abs((data-data2)/data2)), origin="lower", aspect="auto")#, norm=norm)
 # plt.imshow(data-data2, origin="lower", aspect="auto", norm=norm)
-plt.colorbar(label="Value")
-plt.xlabel("Column index")
-plt.ylabel("Row index")
+plt.colorbar(label="Log Fractional error")
+plt.xlabel("gridpoints")
+plt.ylabel("gridpoints")
 
 plt.show()

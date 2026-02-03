@@ -18,8 +18,8 @@ void Grid::init(int i) {
 void Grid::ID_gaussian(double x0, double y0, double sig) {
     for (int j = f1.jmin; j < f1.jmax; j++) {
         for (int i = f1.imin; i < f1.imax; i++) {
-    // for (int j = 0; j < f1.nyg-1; j++) {
-    //     for (int i = 0; i < f1.nxg-1; i++) {
+    // for (int j = 0; j < f1.nyg; j++) {
+    //     for (int i = 0; i < f1.nxg; i++) {
             // r^2 from centre of gaussian
             double rr = pow((x0-f1.get_x(i,j)),2) + pow((y0-f1.get_y(i,j)),2);
             // gaussian
@@ -31,10 +31,10 @@ void Grid::ID_gaussian(double x0, double y0, double sig) {
 }
 
 void Grid::ID_pdisc(double R, double density) {
-    for (int j = f1.jmin; j < f1.jmax; j++) {
-        for (int i = f1.imin; i < f1.imax; i++) {
-    // for (int j = 0; j < f1.nyg-1; j++) {
-    //     for (int i = 0; i < f1.nxg-1; i++) {
+    // for (int j = f1.jmin; j < f1.jmax; j++) {
+    //     for (int i = f1.imin; i < f1.imax; i++) {
+    for (int j = 0; j < f1.nyg; j++) {
+        for (int i = 0; i < f1.nxg; i++) {
             // r^2 from centre of gaussian
             double x = f1.get_x(i,j);
             double y = f1.get_y(i,j);
@@ -49,6 +49,17 @@ void Grid::ID_pdisc(double R, double density) {
                 out = density*( - R*R*R / (3.*sqrt(rr)) );
                 f1.set_data(out,i,j);
             }
+        }
+    }
+}
+
+void Grid::ID_zeros() {
+    for (int j = f1.jmin; j < f1.jmax; j++) {
+        for (int i = f1.imin; i < f1.imax; i++) {
+    // for (int j = 0; j < f1.nyg; j++) {
+    //     for (int i = 0; i < f1.nxg; i++) {
+        // zero initial data 
+            f1.set_data(0,i,j);
         }
     }
 }
@@ -115,9 +126,14 @@ void Grid::relax() {
             f1.set_new_data(new_f1,i,j);
         }
     }
+
+    // debugging
+    f1.copy_old_ghosts_to_new();
+
+
     // immediately after creating new data must fill its ghosts!
     // before diffing!
-    fill_all_ghosts();
+    // fill_all_ghosts();
 
     // change in new solution, L2 norm
     m_delta = f1.delta_data();
@@ -126,7 +142,7 @@ void Grid::relax() {
     // - with the finished new data
     f1.save_new_data();
 
-    fill_all_ghosts();
+    // fill_all_ghosts();
 }
 
 
@@ -179,16 +195,16 @@ void Grid::fill_all_ghosts() {
 }
 
 
-void Grid::save_data() {
-    std::string filename = "data/f.dat";
-    std::ofstream file(filename);
+void Grid::save_data(const std::string& filename) {
+    std::string path = "data/" + filename + ".dat";
+    std::ofstream file(path);
 
     if (!file) {
-        std::cerr << "Error: could not open file " << filename << "\n";
+        std::cerr << "Error: could not open file " << path << "\n";
         return;
     }
 
-    std::cout << "Saving " << filename << std::endl;
+    std::cout << "Saving " << path << std::endl;
 
     // 8 significant figures (not 8 decimal places!)
     file << std::scientific << std::setprecision(p.save_precision);

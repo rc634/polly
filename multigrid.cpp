@@ -3,6 +3,8 @@
 Multigrid::Multigrid() {
     // resize vector
     grids.resize(p.num_grids);
+    i_coarse = 0;
+    i_fine = p.num_grids-1;
 }
 
 void Multigrid::init() {
@@ -13,10 +15,6 @@ void Multigrid::init() {
     // copy over finest grid 
     fine_grid_ptr = &grids[p.num_grids-1];
     coarse_grid_ptr = &grids[0];
-
-    // set initial data on field
-    initial_data();
-    fill_all_ghosts();
 }
 
 void Multigrid::fill_all_ghosts() {
@@ -27,18 +25,26 @@ void Multigrid::fill_all_ghosts() {
 }
 
 void Multigrid::initial_data() {
-    double x0 = 0.2;
-    double y0 = 0.3;
-    double sig = 0.1;
-    // std::cout << "Setting Poisson Disc initial data !\n";
-    // fine_grid_ptr->ID_pdisc(0.1,100); // R_0, rho_0, radius, density 
-    // std::cout << "Setting Gaussian initial data !\n";
-    // fine_grid_ptr->ID_gaussian(x0,y0,sig);
+    std::cout << "Zeroing initial data !\n";
+    fine_grid_ptr->ID_zeros();
+    std::cout << "Integral of solution : " << fine_grid_ptr->field_integral() << "\n";
 
-    //flush();
+    // fill_all_ghosts();
+}
+
+void Multigrid::analytic_solution() {
+    std::cout << "Setting Poisson Disc initial data !\n";
+    // loop all grids
+    for (size_t i = i_coarse; i <= i_fine; i++)
+    {
+        grids[i].ID_pdisc(0.1,100); // R_0, rho_0, radius, density
+    }
+     
+    std::cout << "Integral of solution : " << fine_grid_ptr->field_integral() << "\n";
 }
 
 // for testing only, can cause large errors
+// restricts data from fine to coarse then prolongates data back to fine
 void Multigrid::flush() {
     // Restriction 
 
@@ -57,12 +63,18 @@ void Multigrid::flush() {
     }
 }
 
+/////////////////////////////
+// V CYCLE 
 
-void Multigrid::v_cycle() {
+void Multigrid::v_cycle(int i_top, int i_bot) {
     // Restriction 
+    if (i_top > i_fine || i_bot < i_coarse) {
+        std::cout << "Warning! incorrect i_top or i_bot given to Multigrid::v_cycle!\n";
+        return;
+    }
 
     // loop down over grids to set initial data on all levels
-    for (int i = p.num_grids-1; i>= 1; i--)
+    for (int i = i_top; i > i_bot; i--)
     {
         //std::cout << "Relax grid " << i << "\n"; 
         for (int q = 0; q<p.iter; q++)
@@ -76,7 +88,7 @@ void Multigrid::v_cycle() {
     // Prolongation 
 
     // loop up over grids to set initial data on all levels
-    for (int i = 0; i < p.num_grids-1; i++)
+    for (int i = i_bot; i < i_top; i++)
     {
         //std::cout << "Relax grid " << i << "\n"; 
         for (int q = 0; q<p.iter; q++)
@@ -95,15 +107,29 @@ void Multigrid::v_cycle() {
     }
 }
 
+/////////////////////////////
+// W CYCLE 
+
+void Multigrid::w_cycle() {
+    int n = 1;
+    for (size_t i = i_coarse; i < i_fine; i++) {
+        // q=n repitions 
+        for (size_t q = 0; q < n; q++) {
+            v_cycle(i_fine, i);
+        }
+        n*=2;
+    }
+}
+
 void Multigrid::refine() {
     // Restriction 
 
     fine_grid_ptr->relax();
 }
 
-void Multigrid::save_data() {
-    fine_grid_ptr->save_data();
-    //coarse_grid_ptr->save_data();
+void Multigrid::save_data(const std::string& filename) {
+    fine_grid_ptr->save_data(filename);
+    //coarse_grid_ptr->save_data(filename);
 }
 
 void Multigrid::hello() {
