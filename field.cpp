@@ -24,6 +24,8 @@ void Field::init(int i) {
     // data arrays
     data.resize(n_flat,0.0);
     data_new.resize(n_flat,0.0);
+    rhs.resize(n_flat,0.0);
+    tau.resize(n_flat,0.0);
 
     // indices 
     imin = ng;
