@@ -16,10 +16,10 @@ fig, axes = plt.subplots(
     constrained_layout=True   # ← key change
 )
 
-im1 = axes[0].imshow(data, origin="lower", aspect="auto", norm=norm)
+im1 = axes[0].imshow(data, origin="lower", aspect="auto")#, norm=norm)
 axes[0].set_title("f.dat")
 
-im2 = axes[1].imshow(data2, origin="lower", aspect="auto", norm=norm)
+im2 = axes[1].imshow(data2, origin="lower", aspect="auto")#, norm=norm)
 axes[1].set_title("g.dat")
 axes[1].set_xlabel("Column index")
 

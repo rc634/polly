@@ -21,17 +21,19 @@ void Field::init(int i) {
     // flattened array index
     n_flat = nxg*nyg;
 
+    // indices 
+    imin = ng;
+    imax = ng + nx;
+    jmin = ng;
+    jmax = ng + ny;
+
     // data arrays
     data.resize(n_flat,0.0);
     data_new.resize(n_flat,0.0);
     rhs.resize(n_flat,0.0);
     tau.resize(n_flat,0.0);
 
-    // indices 
-    imin = ng;
-    imax = ng + nx;
-    jmin = ng;
-    jmax = ng + ny;
+    
 
 }
 

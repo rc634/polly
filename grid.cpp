@@ -4,82 +4,136 @@
 #include <iomanip> // for precision output
 #include <algorithm> // for std::min
 
+// for pi 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 
 Grid::Grid() {
 }
 
 void Grid::init(int i) {
+    // numerical gridpoint stuff 
     grid_n = i;
-    f1.init(grid_n);
+    nx = (int) pow(2,grid_n) * p.nx;
+    ny = (int) pow(2,grid_n) * p.ny;
+    // cell centered
+    dx = (p.xU-p.xL)/nx;
+    dy = (p.yU-p.yL)/ny;
+
+    // deal with ghosts 
+    ng = p.ng;
+    nxg = nx + 2*ng;
+    nyg = ny + 2*ng;
+    // flattened array index
+    n_flat = nxg*nyg;
+
+    // indices 
+    imin = ng;
+    imax = ng + nx;
+    jmin = ng;
+    jmax = ng + ny;
+
+    // feild data stuff 
+    W.init(grid_n);
+    psi.init(grid_n);
+
     // courant friendly timestep
-    m_dt = p.CFL*std::min(f1.dx,f1.dy)*std::min(f1.dx,f1.dy);
+    m_dt = p.CFL*std::min(dx,dy)*std::min(dx,dy);
 }
 
 void Grid::ID_gaussian(double x0, double y0, double sig) {
-    for (int j = f1.jmin; j < f1.jmax; j++) {
-        for (int i = f1.imin; i < f1.imax; i++) {
-    // for (int j = 0; j < f1.nyg; j++) {
-    //     for (int i = 0; i < f1.nxg; i++) {
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+    // for (int j = 0; j < nyg; j++) {
+    //     for (int i = 0; i < nxg; i++) {
             // r^2 from centre of gaussian
-            double rr = pow((x0-f1.get_x(i,j)),2) + pow((y0-f1.get_y(i,j)),2);
+            double rr = pow((x0-W.get_x(i,j)),2) + pow((y0-W.get_y(i,j)),2);
             // gaussian
             double val = exp(-(rr)/(2.*sig*sig));
             // set data 
-            f1.set_data(val,i,j);
+            W.set_data(val,i,j);
         }
     }
 }
 
 void Grid::ID_pdisc(double R, double density) {
-    // for (int j = f1.jmin; j < f1.jmax; j++) {
-    //     for (int i = f1.imin; i < f1.imax; i++) {
-    for (int j = 0; j < f1.nyg; j++) {
-        for (int i = 0; i < f1.nxg; i++) {
+    // for (int j = jmin; j < jmax; j++) {
+    //     for (int i = imin; i < imax; i++) {
+    for (int j = 0; j < nyg; j++) {
+        for (int i = 0; i < nxg; i++) {
             // r^2 from centre of gaussian
-            double x = f1.get_x(i,j);
-            double y = f1.get_y(i,j);
+            double x = W.get_x(i,j);
+            double y = W.get_y(i,j);
             double rr = pow((0.0-x),2) + pow((0.5-y),2);
             double out = 0.0;
             // disc of densiy for radii < R
             if (rr < R*R) {
                 out = density*(rr/6. - 0.5*R*R);
-                f1.set_data(out,i,j);
+                W.set_data(out,i,j);
             } 
             else {
                 out = density*( - R*R*R / (3.*sqrt(rr)) );
-                f1.set_data(out,i,j);
+                W.set_data(out,i,j);
             }
         }
     }
 }
 
 void Grid::ID_zeros() {
-    for (int j = f1.jmin; j < f1.jmax; j++) {
-        for (int i = f1.imin; i < f1.imax; i++) {
-    // for (int j = 0; j < f1.nyg; j++) {
-    //     for (int i = 0; i < f1.nxg; i++) {
+
+    //////////////////////////////////////////
+    // // excludes ghosts 
+    // for (int j = jmin; j < jmax; j++) {
+    //     for (int i = imin; i < imax; i++) {
+
+    //////////////////////////////////////////
+    // includes ghosts 
+    for (int j = 0; j < nyg; j++) {
+        for (int i = 0; i < nxg; i++) {
+
         // zero initial data 
-            f1.set_data(0,i,j);
+            W.set_data(0.,i,j);
+            psi.set_data(1.,i,j);
         }
     }
-}
-
-double Grid::L2norm() {
-    double L2 = 0.;
-    for (int k = 0; k < f1.n_flat; k++) {
-        L2 += f1.data[k]*f1.data[k];
-    }
-    return sqrt(L2);
 }
 
 double Grid::field_integral() {
     // can add metrics if wanted 
     double integral = 0.;
     double root_g = 1.;
-    for (int j = f1.jmin; j < f1.jmax; j++) {
-        for (int i = f1.imin; i < f1.imax; i++) {
-            // root g ...
-            integral += f1.get_data(i,j) * root_g * f1.dx * f1.dy;
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            // root_g should = x
+            integral += W.get_data(i,j) * root_g * dx * dy;
+            integral += psi.get_data(i,j) * root_g * dx * dy;
+        }
+    }
+    return integral;
+}
+
+double Grid::int_W() {
+    // can add metrics if wanted 
+    double integral = 0.;
+    double root_g = 1.;
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            // root_g should = x
+            integral += W.get_data(i,j) * root_g * dx * dy;
+        }
+    }
+    return integral;
+}
+
+double Grid::int_psi() {
+    // can add metrics if wanted 
+    double integral = 0.;
+    double root_g = 1.;
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            // root_g should = x
+            integral += psi.get_data(i,j) * root_g * dx * dy;
         }
     }
     return integral;
@@ -90,107 +144,129 @@ void Grid::relax() {
     // One Relaxation step 
     
     // loop over all live cells 
-    for (int j = f1.jmin; j < f1.jmax; j++) {
-        for (int i = f1.imin; i < f1.imax; i++) {
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
             // time evolution step
 
-            // coordinate 
-            double x = f1.get_x(i,j);
-            double y = f1.get_y(i,j);
+            // const 
+            double pi = M_PI;
+
+            // coordinates 
+            double x = W.get_x(i,j);
+            double y = W.get_y(i,j);
             double r = sqrt(x*x + y*y);
 
-            // gaussian stats
-            double x0 = 0.0;
-            double y0 = 0.5;
-            double r0 = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0));
-            double rmax = 0.1;
-            double sigx = 0.1;
-            double sigy = 0.15;
+            // field values 
+            double Wij = W.get_data(i,j);
+            double psij = psi.get_data(i,j);
+            double dWdx = W.d1x(i,j);
+            double dWdy = W.d1y(i,j);
+
+            // source stats -- const elipsoid
+            double height = 0.18;
+            double width = 0.3; 
+            double xf = x/width;
+            double yf = y/height;
 
             // source terms
-            double src_f1 = 0;
-            if (r0 < rmax) {
-                // src_f1 = exp(-(x-x0)*(x-x0)/(2*sigx*sigx))
-                //        * exp(-(y-y0)*(y-y0)/(2*sigy*sigy));
-                src_f1 = 100.;
+            double src_psi = 0.; // psi source
+            double src_W = 0.; // W source
+            double rho = 10.; // density source 
+            double omega = 1.; // rotation source
+
+            // if inside ellipse
+            if (xf*xf + yf*yf < 1.) {
+                src_W = 8. * pi * x * rho * omega;
+                src_psi = -2. * pi * rho;
             }
+            src_W += Wij/x/x;
+            src_psi += - 0.5 * pow(psij,-7) * (
+                dWdx*dWdx + dWdy*dWdy + Wij*Wij/x/x
+            );
 
             // poisson eqaution
-            // double df1_dt = f1.cartesian_laplacian(i,j) - src_f1;
-            double df1_dt = f1.cylindrical_laplacian(i,j,x) - src_f1;
+            double dW_dt = W.cylindrical_laplacian(i,j,x) - src_W;
+            double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - src_psi;
 
             // timestep f_new = f_old + dt * df/dt
-            double new_f1 = f1.get_data(i,j) + df1_dt * m_dt;
+            double new_W = W.get_data(i,j) + dW_dt * m_dt;
+            double new_psi = psi.get_data(i,j) + dpsi_dt * m_dt;
 
             // set new-data stage 
-            f1.set_new_data(new_f1,i,j);
+            W.set_new_data(new_W,i,j);
+            psi.set_new_data(new_psi,i,j);
         }
     }
 
     // debugging
-    f1.copy_old_ghosts_to_new();
+    // W.copy_old_ghosts_to_new();
 
 
     // immediately after creating new data must fill its ghosts!
     // before diffing!
-    // fill_all_ghosts();
+    fill_all_ghosts();
 
     // change in new solution, L2 norm
-    m_delta = f1.delta_data();
+    m_delta = W.delta_data() + psi.delta_data();
 
     // Save over the old data - 
     // - with the finished new data
-    f1.save_new_data();
+    W.save_new_data();
+    psi.save_new_data();
 
-    // fill_all_ghosts();
+    fill_all_ghosts();
 }
 
 
 void Grid::fill_all_ghosts() {
     // two ghosts thickness hard coded!
 
-    // loop left boundary
-    for (int j = 0; j < f1.nyg; j++) {
-        f1.set_data(f1.get_data(3,j),0,j);
-        f1.set_data(f1.get_data(2,j),1,j);
-        f1.set_new_data(f1.get_new_data(3,j),0,j);
-        f1.set_new_data(f1.get_new_data(2,j),1,j);
+    // loop left boundary -- symmetric
+    for (int j = 0; j < nyg; j++) {
+        W.set_data(W.get_data(3,j),0,j);
+        W.set_data(W.get_data(2,j),1,j);
+        W.set_new_data(W.get_new_data(3,j),0,j);
+        W.set_new_data(W.get_new_data(2,j),1,j);
+        psi.set_data(psi.get_data(3,j),0,j);
+        psi.set_data(psi.get_data(2,j),1,j);
+        psi.set_new_data(psi.get_new_data(3,j),0,j);
+        psi.set_new_data(psi.get_new_data(2,j),1,j);
     }
-    // fake 1/r boundary stuff 
-    double dx = f1.dx, dy = f1.dy, dr=0.;
-    double r = 1., x=0., y=0.;
-    double nxg=f1.nxg, nyg=f1.nyg;
+    
+    // other boundaries are zero
+
     // loop right boundary
-    for (int j = 0; j < f1.nyg; j++) {
-        y = -0.5+ j/f1.nyg;
-        r = sqrt(1.+ y*y);
-        dr = dx * abs(x) / r;
-        f1.set_data( f1.get_data(nxg-3,j) * (1-dr/r), nxg-2, j);
-        f1.set_data( f1.get_data(nxg-2,j) * (1-dr/(r+dr)), nxg-1, j);
-        f1.set_new_data( f1.get_new_data(nxg-3,j) * (1-dr/r), nxg-2, j);
-        f1.set_new_data( f1.get_new_data(nxg-2,j) * (1-dr/(r+dr)), nxg-1, j);
+    for (int j = 0; j < nyg; j++) {
+        W.set_data(0., nxg-2, j);
+        W.set_data(0., nxg-1, j);
+        W.set_new_data(0., nxg-2, j);
+        W.set_new_data(0., nxg-1, j);
+        psi.set_data(1., nxg-2, j);
+        psi.set_data(1., nxg-1, j);
+        psi.set_new_data(1., nxg-2, j);
+        psi.set_new_data(1., nxg-1, j);
     }
     // loop top boundary
-    for (int i = 0; i < f1.nxg; i++) {
-        x = i/f1.nxg;
-        y = 0.5;
-        r = sqrt(0.25 + x*x);
-        dr = dy * abs(y) / r;
-        f1.set_data( f1.get_data(i,nyg-3) * (1-dr/r), i, nyg-2);
-        f1.set_data( f1.get_data(i,nyg-2) * (1-dr/(r+dr)), i, nyg-1);
-        f1.set_new_data( f1.get_new_data(i,nyg-3) * (1-dr/r), i, nyg-2);
-        f1.set_new_data( f1.get_new_data(i,nyg-2) * (1-dr/(r+dr)), i, nyg-1);
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(0., i, nyg-2);
+        W.set_data(0., i, nyg-1);
+        W.set_new_data(0., i, nyg-2);
+        W.set_new_data(0., i, nyg-1);
+        psi.set_data(1., i, nyg-2);
+        psi.set_data(1., i, nyg-1);
+        psi.set_new_data(1., i, nyg-2);
+        psi.set_new_data(1., i, nyg-1);
     }
-    // loop bottom boundary
-    for (int i = 0; i < f1.nxg; i++) {
-        x = i/f1.nxg;
-        y = -0.5;
-        r = sqrt(0.25 + x*x);
-        dr = dy * abs(y) / r;
-        f1.set_data( f1.get_data(i,2) * (1-dr/r), i,1);
-        f1.set_data( f1.get_data(i,1) * (1-dr/(r+dr)), i,0);
-        f1.set_new_data( f1.get_new_data(i,2) * (1-dr/r), i,1);
-        f1.set_new_data( f1.get_new_data(i,1) * (1-dr/(r+dr)), i,0);
+    // loop bottom boundary -- symetric 
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(W.get_data(i,2), i, 1);
+        W.set_data(W.get_data(i,3), i, 0);
+        W.set_new_data(W.get_new_data(i,2), i, 1);
+        W.set_new_data(W.get_new_data(i,3), i, 0);
+        psi.set_data(psi.get_data(i,2), i, 1);
+        psi.set_data(psi.get_data(i,3), i, 0);
+        psi.set_new_data(psi.get_new_data(i,2), i, 1);
+        psi.set_new_data(psi.get_new_data(i,3), i, 0);
     }
 }
 
@@ -206,17 +282,21 @@ void Grid::save_data(const std::string& filename) {
 
     std::cout << "Saving " << path << std::endl;
 
-    // 8 significant figures (not 8 decimal places!)
+    // set savae resolution
     file << std::scientific << std::setprecision(p.save_precision);
 
-    // auto f_ = f1; // lazy 
+    // auto f_ = W; // lazy 
 
-    // write everything 
-    // including ghost cells for now 
-    for (int j = 0; j < f1.nyg; j++) {
-        for (int i = 0; i < f1.nxg; i++) {
-            file << f1.get_data(i,j) ;
-            if (i==f1.nxg-1) {
+    // write 
+    // excluding ghost cells 
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+    // // including ghost cells 
+    // for (int j = 0; j < nyg; j++) {
+    //     for (int i = 0; i < nxg; i++) {
+            file << W.get_data(i,j) ;
+            //if (i==nxg-1) {
+            if (i==imax-1) {
                 break;
             }
             file << ",";
@@ -227,7 +307,57 @@ void Grid::save_data(const std::string& filename) {
     file.close();
 }
 
+void Grid::save_state() {
+    std::string path1 = "data/W.dat";
+    std::ofstream file1(path1);
+    std::string path2 = "data/psi.dat";
+    std::ofstream file2(path2);
+
+    if (!file1) {
+        std::cerr << "Error: could not open file " << path1 << "\n";
+        return;
+    }
+
+    if (!file2) {
+        std::cerr << "Error: could not open file " << path2 << "\n";
+        return;
+    }
+
+    std::cout << "Saving " << path1 << std::endl;
+    std::cout << "Saving " << path2 << std::endl;
+
+    // set save resolution
+    file1 << std::scientific << std::setprecision(p.save_precision);
+    file2 << std::scientific << std::setprecision(p.save_precision);
+
+    // write 
+    // excluding ghost cells 
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+    // // including ghost cells 
+    // for (int j = 0; j < nyg; j++) {
+    //     for (int i = 0; i < nxg; i++) {
+            file1 << W.get_data(i,j) ;
+            file2 << psi.get_data(i,j) ;
+            //if (i==nxg-1) {
+            if (i==imax-1) {
+                break;
+            }
+            file1 << ",";
+            file2 << ",";
+        }
+        file1 << "\n";
+        file2 << "\n";
+    }
+
+    file1.close();
+    file2.close();
+}
+
+
+
+
 void Grid::hello() {
     std::cout << "Hello from Grid :  " << grid_n << "\n"; 
-    f1.hello();
+    W.hello();
 }

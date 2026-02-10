@@ -141,36 +141,36 @@ void Multigrid::hello() {
 }
 
 void Multigrid::restrict_down(const Grid &fine, Grid &coarse) {
-    for (int j = coarse.f1.jmin; j < coarse.f1.jmax; j++) {
-        for (int i = coarse.f1.imin; i < coarse.f1.imax; i++) {
+    for (int j = coarse.jmin; j < coarse.jmax; j++) {
+        for (int i = coarse.imin; i < coarse.imax; i++) {
             // fine indices
             int i1 = i*2 - p.ng;
             int i2 = i*2 - p.ng + 1;
             int j1 = j*2 - p.ng;
             int j2 = j*2 - p.ng + 1;
 
-            double val = fine.f1.get_data(i1,j1) + 
-                            fine.f1.get_data(i2,j1) + 
-                            fine.f1.get_data(i1,j2) + 
-                            fine.f1.get_data(i2,j2);
+            double val = fine.W.get_data(i1,j1) + 
+                            fine.W.get_data(i2,j1) + 
+                            fine.W.get_data(i1,j2) + 
+                            fine.W.get_data(i2,j2);
 
             val *= 0.25;
 
-            coarse.f1.set_data(val,i,j);
+            coarse.W.set_data(val,i,j);
         }
     }
 }
 
 
 void Multigrid::prolongate_up(const Grid &coarse, Grid &fine) {
-    for (int j = fine.f1.jmin; j < fine.f1.jmax; j++) {
-        for (int i = fine.f1.imin; i < fine.f1.imax; i++) {
+    for (int j = fine.jmin; j < fine.jmax; j++) {
+        for (int i = fine.imin; i < fine.imax; i++) {
 
             // ask for bilinear interpolation 
-            double x = fine.f1.get_x(i,j);
-            double y = fine.f1.get_y(i,j);
-            double val = coarse.f1.bilinear_interp_xy(x,y);
-            fine.f1.set_data(val,i,j);
+            double x = fine.W.get_x(i,j);
+            double y = fine.W.get_y(i,j);
+            double val = coarse.W.bilinear_interp_xy(x,y);
+            fine.W.set_data(val,i,j);
         }
     }
 }

@@ -2,7 +2,7 @@
 #pragma once
 
 struct Params {
-    int num_grids = 5;       // grids [0, num_grids-1]
+    int num_grids = 3;       // grids [0, num_grids-1]
     int nx = 32;             // grid points in x on coarsest level
     int ny = 32;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
@@ -12,13 +12,14 @@ struct Params {
     double iter = 128; // relaxation steps after/before prolongation/restriction
 
     // lewey friedrich stabiilty thingy 
-    double CFL = 0.25;
+    // normally 0.25, but the W/x^2 term prefers 0.125
+    double CFL = 0.125;
 
     // physical boundaries, upper lower
     double xL = 0.;
-    double xU = 1.;
+    double xU = 2.;
     double yL = 0.;
-    double yU = 1.;
+    double yU = 2.;
 
     // data saving
     int save_precision = 16;

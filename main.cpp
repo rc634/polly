@@ -22,12 +22,9 @@ int main() {
     int i_bot = mg.i_coarse;
     int n_trigger = 200;
 
-    // first measure the analytic solution for convergence testing
-    mg.analytic_solution();
-    mg.save_data("g");
-
     // set zeros for the solver to start from
     mg.initial_data();
+    mg.save_data("g");
 
     
 
@@ -59,11 +56,12 @@ int main() {
     //     old_delta = new_delta;
     // }
 
-    for (int n=1; n<=50; n++) {
+    for (int n=1; n<=20; n++) {
         mg.w_cycle();
         std::cout << ">- WCYCLE " << n << " : ";
-        std::cout << "integral " << mg.fine_grid_ptr->field_integral();
-        std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
+        std::cout << "integral W " << mg.fine_grid_ptr->int_W();
+        std::cout << " : integral psi " << mg.fine_grid_ptr->int_psi() << "\n";
+        // std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
         std::cout << " : delta integral " 
                 << mg.fine_grid_ptr->field_integral()-old_integral << "\n";
 
@@ -73,7 +71,7 @@ int main() {
         old_integral = mg.fine_grid_ptr->field_integral();
     }
 
-    for (int n=1; n<=200000; n++) {
+    for (int n=1; n<=1000000; n++) {
         // lets goooooo!
 
         mg.refine();
@@ -92,6 +90,8 @@ int main() {
     }
 
     mg.save_data("f");
+
+    mg.fine_grid_ptr->save_state();
 
     return 0;
 }

@@ -9,8 +9,33 @@ public:
     // total number of points
     int num_vars = 1;
 
+    // gridpoints
+    int nx;
+    int ny;
+    double dx;
+    double dy;
+
+    // physical sizes including ghosts
+    double xL, xU, yL, yU;
+
+    // numerical problem size 
+    int nxg;
+    int nyg;
+    int n_flat;
+
+    // used for looping physics 
+    // for (i = imin; i < imax; i++ )...
+    int imin;
+    int imax;
+    int jmin;
+    int jmax;
+
+    // ghost layers (e.g. per side)
+    int ng;
+
     // set of physics fields 
-    Field f1;
+    Field W;
+    Field psi;
 
     // place in heirarchy
     int grid_n; 
@@ -34,9 +59,9 @@ public:
 
     void ID_pdisc(double R, double density);
 
-    double L2norm();
-
     double field_integral();
+    double int_W();
+    double int_psi();
 
     // parabolic diffusion type relaxation
     void relax();
@@ -45,6 +70,7 @@ public:
 
     // save data 
     void save_data(const std::string& filename);
+    void save_state();
 
     void hello();
 };
