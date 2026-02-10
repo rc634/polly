@@ -163,25 +163,31 @@ void Grid::relax() {
             double dWdy = W.d1y(i,j);
 
             // source stats -- const elipsoid
-            double height = 0.18;
-            double width = 0.3; 
+            double height = 1.;
+            double width = 1.; 
+            // fractional coords wrt ellipsoid
             double xf = x/width;
             double yf = y/height;
+            double rf = sqrt(xf*xf + yf*yf);
 
             // source terms
             double src_psi = 0.; // psi source
             double src_W = 0.; // W source
-            double rho = 10.; // density source 
-            double omega = 1.; // rotation source
+            double rho = 1.; // density source 
+            double omega = 0.1; // rotation source
+            double packet = 0.; // overall shape of source 
 
             // if inside ellipse
             if (xf*xf + yf*yf < 1.) {
-                src_W = 8. * pi * x * rho * omega;
-                src_psi = -2. * pi * rho;
+                packet = 1 + cos(rf * pi);
+                packet *= packet;
+                src_W = 8. * pi * x * rho * omega * packet;
+                src_psi = -2. * pi * rho * packet;
             }
             src_W += Wij/x/x;
             src_psi += - 0.5 * pow(psij,-7) * (
-                dWdx*dWdx + dWdy*dWdy + Wij*Wij/x/x
+                dWdy*dWdy + dWdx*dWdx 
+                - 2.*dWdx*Wij/x + Wij*Wij/x/x
             );
 
             // poisson eqaution

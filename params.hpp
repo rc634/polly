@@ -3,8 +3,8 @@
 
 struct Params {
     int num_grids = 3;       // grids [0, num_grids-1]
-    int nx = 32;             // grid points in x on coarsest level
-    int ny = 32;             // grid points in y on coarsest level
+    int nx = 16;             // grid points in x on coarsest level
+    int ny = 16;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
     double tol = 1e-6;       // convergence tolerance
     
@@ -17,12 +17,12 @@ struct Params {
 
     // physical boundaries, upper lower
     double xL = 0.;
-    double xU = 2.;
+    double xU = 5.;
     double yL = 0.;
-    double yU = 2.;
+    double yU = 5.;
 
     // data saving
-    int save_precision = 16;
+    int save_precision = 8;
 };
 
 // notes 

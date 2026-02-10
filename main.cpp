@@ -56,7 +56,7 @@ int main() {
     //     old_delta = new_delta;
     // }
 
-    for (int n=1; n<=20; n++) {
+    for (int n=1; n<=25; n++) {
         mg.w_cycle();
         std::cout << ">- WCYCLE " << n << " : ";
         std::cout << "integral W " << mg.fine_grid_ptr->int_W();
@@ -71,23 +71,50 @@ int main() {
         old_integral = mg.fine_grid_ptr->field_integral();
     }
 
-    for (int n=1; n<=1000000; n++) {
+
+
+    // for (int n=1; n<=100000; n++) {
+    //     // lets goooooo!
+
+    //     mg.refine();
+
+    //     new_delta = mg.fine_grid_ptr->m_delta;
+
+    //     if (n%10000==0)
+    //     {
+    //         std::cout << ">- REFINEMENT " << n << " : ";
+    //         std::cout << "integral " << mg.fine_grid_ptr->field_integral();
+    //         std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
+    //         std::cout << " : d-delta " << new_delta-old_delta << "\n";
+    //     }
+
+    //     old_delta = new_delta;
+    // }
+
+
+
+    for (int n=1; n<=100000; n++) {
         // lets goooooo!
 
         mg.refine();
-
-        new_delta = mg.fine_grid_ptr->m_delta;
-
-        if (n%10000==0)
-        {
+        
+        if (n%10000==0) {
             std::cout << ">- REFINEMENT " << n << " : ";
-            std::cout << "integral " << mg.fine_grid_ptr->field_integral();
-            std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
-            std::cout << " : d-delta " << new_delta-old_delta << "\n";
-        }
+            std::cout << "integral W " << mg.fine_grid_ptr->int_W();
+            std::cout << " : integral psi " << mg.fine_grid_ptr->int_psi() << "\n";
+            // std::cout << " : delta " << mg.fine_grid_ptr->m_delta << "\n";
+            std::cout << " : delta integral " 
+                    << mg.fine_grid_ptr->field_integral()-old_integral << "\n";
 
-        old_delta = new_delta;
+            if (abs(mg.fine_grid_ptr->field_integral()-old_integral)<10e-20) {
+                break;
+        }
+        }
+        old_integral = mg.fine_grid_ptr->field_integral();
     }
+
+
+
 
     mg.save_data("f");
 
