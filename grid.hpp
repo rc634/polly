@@ -45,6 +45,7 @@ public:
 
     // the effective timestep
     double m_dt;
+    double m_SOR; // successive over relax
 
     // error or delta 
     double m_delta;

@@ -1,4 +1,6 @@
 #include "multigrid.hpp"
+#include <cmath>
+#include <iomanip>
 
 Multigrid::Multigrid() {
     // resize vector
@@ -24,10 +26,14 @@ void Multigrid::fill_all_ghosts() {
     }
 }
 
+
 void Multigrid::initial_data() {
     std::cout << "Zeroing initial data !\n";
-    fine_grid_ptr->ID_zeros();
-    std::cout << "Integral of solution : " << fine_grid_ptr->field_integral() << "\n";
+    for (int i = 0; i < p.num_grids; i++)
+    {
+        grids[i].ID_zeros();
+    }
+    // std::cout << "Integral of solution : " << fine_grid_ptr->field_integral() << "\n";
 
     // fill_all_ghosts();
 }
@@ -64,6 +70,56 @@ void Multigrid::flush() {
 }
 
 /////////////////////////////
+// UP CYCLE 
+
+// solves from bottom grid up
+// satisfies accuracy criterion on each grid advancement
+
+void Multigrid::up_cycle(const double epsilon) {
+    // output precision 
+    std::cout << std::setprecision(8);
+
+    // flush values down so that all levels are initialised
+    v_cycle(i_fine,i_coarse);
+    double diff = 100.; // init large to be safe
+    int count = 0;
+    double sor = 1.; // over relax param 1-4 in theory
+    double sor_max = 1.5; // in practice max to this!
+    // loop up through all grids
+    for (size_t i = i_coarse; i <= i_fine; i++)
+    {
+        // lazy boi
+        grids[i].fill_all_ghosts();
+        count = 0;
+
+        std::cout << "Entering Grid Number " << i << std::endl;
+        while (true) {
+            grids[i].m_SOR = sor;
+            for (int q = 0; q<p.iter; q++)
+            {
+                grids[i].relax();
+            }
+            sor = sor + 0.2 * (sor_max-sor);
+            diff = abs(grids[i].m_delta);
+            if (diff < epsilon) break;
+            std::cout << " * " << count * p.iter << " - diff : " << diff << "\n";
+            std::cout << " - ~ CFL : " << p.CFL*sor << "\n";
+            std::cout << " - ~ int W = " << grids[i].int_W() 
+                      << ", int psi = " << grids[i].int_psi() << "\n";
+            std::cout << " * - ~ - ~ - \n";
+            count += 1;
+        }
+
+        // this creates noise! need to smooth before cranking over relaxation!
+        if (i!=i_fine) {
+            prolongate_up(grids[i],grids[i+1]);
+        }
+        // reset sor
+        sor = 1.;
+    }
+}
+
+/////////////////////////////
 // V CYCLE 
 
 void Multigrid::v_cycle(int i_top, int i_bot) {
@@ -76,12 +132,12 @@ void Multigrid::v_cycle(int i_top, int i_bot) {
     // loop down over grids to set initial data on all levels
     for (int i = i_top; i > i_bot; i--)
     {
-        //std::cout << "Relax grid " << i << "\n"; 
+        // std::cout << "Relax grid " << i << "\n"; 
         for (int q = 0; q<p.iter; q++)
         {
             grids[i].relax();
         }
-        //std::cout << "Restrict " << i << " to " << i-1 <<"\n";
+        // std::cout << "Restrict " << i << " to " << i-1 <<"\n";
         restrict_down(grids[i],grids[i-1]);
     }
 
@@ -90,16 +146,16 @@ void Multigrid::v_cycle(int i_top, int i_bot) {
     // loop up over grids to set initial data on all levels
     for (int i = i_bot; i < i_top; i++)
     {
-        //std::cout << "Relax grid " << i << "\n"; 
+        // std::cout << "Relax grid " << i << "\n"; 
         for (int q = 0; q<p.iter; q++)
         {
             grids[i].relax();
         }
-        //std::cout << "Prolong " << i << " to " << i+1 <<"\n";
+        // std::cout << "Prolong " << i << " to " << i+1 <<"\n";
         prolongate_up(grids[i],grids[i+1]);
     }
 
-    //std::cout << "Fine level relax\n"; 
+    // std::cout << "Fine level relax\n"; 
     // final smoothing
     for (int q = 0; q<p.iter; q++)
     {
@@ -141,36 +197,54 @@ void Multigrid::hello() {
 }
 
 void Multigrid::restrict_down(const Grid &fine, Grid &coarse) {
+    double valW = 0;
+    double valPsi = 0;
+    // fine indices
+    int i1 = 0;
+    int i2 = 0;
+    int j1 = 0;
+    int j2 = 0;
     for (int j = coarse.jmin; j < coarse.jmax; j++) {
         for (int i = coarse.imin; i < coarse.imax; i++) {
             // fine indices
-            int i1 = i*2 - p.ng;
-            int i2 = i*2 - p.ng + 1;
-            int j1 = j*2 - p.ng;
-            int j2 = j*2 - p.ng + 1;
+            i1 = i*2 - p.ng;
+            i2 = i*2 - p.ng + 1;
+            j1 = j*2 - p.ng;
+            j2 = j*2 - p.ng + 1;
 
-            double val = fine.W.get_data(i1,j1) + 
-                            fine.W.get_data(i2,j1) + 
-                            fine.W.get_data(i1,j2) + 
-                            fine.W.get_data(i2,j2);
+            valW = fine.W.get_data(i1,j1) + 
+                    fine.W.get_data(i2,j1) + 
+                    fine.W.get_data(i1,j2) + 
+                    fine.W.get_data(i2,j2);
+            valPsi = fine.psi.get_data(i1,j1) + 
+                    fine.psi.get_data(i2,j1) + 
+                    fine.psi.get_data(i1,j2) + 
+                    fine.psi.get_data(i2,j2);
+            valW *= 0.25;
+            valPsi *= 0.25;
 
-            val *= 0.25;
-
-            coarse.W.set_data(val,i,j);
+            coarse.W.set_data(valW,i,j);
+            coarse.psi.set_data(valPsi,i,j);
         }
     }
 }
 
 
 void Multigrid::prolongate_up(const Grid &coarse, Grid &fine) {
+    double x = 0.;
+    double y = 0.;
+    double valW = 0.;
+    double valPsi = 0.;
     for (int j = fine.jmin; j < fine.jmax; j++) {
         for (int i = fine.imin; i < fine.imax; i++) {
 
             // ask for bilinear interpolation 
-            double x = fine.W.get_x(i,j);
-            double y = fine.W.get_y(i,j);
-            double val = coarse.W.bilinear_interp_xy(x,y);
-            fine.W.set_data(val,i,j);
+            x = fine.W.get_x(i,j);
+            y = fine.W.get_y(i,j);
+            valW = coarse.W.bilinear_interp_xy(x,y);
+            valPsi = coarse.psi.bilinear_interp_xy(x,y);
+            fine.W.set_data(valW,i,j);
+            fine.psi.set_data(valPsi,i,j);
         }
     }
 }

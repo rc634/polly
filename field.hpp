@@ -45,12 +45,12 @@ public:
     // u_i <- u_i + dt * (rhs - laplacian_i)
     // fixed for a whole v cycle 
     // created and fixed on restriction
-    std::vector<double> rhs; 
+    // std::vector<double> rhs; 
 
     // dual variable
     // acts as residual on restriction 
     // acts as delta on prolongation
-    std::vector<double> tau; 
+    // std::vector<double> tau; 
 
     Field();
 

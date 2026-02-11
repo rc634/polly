@@ -2,14 +2,14 @@
 #pragma once
 
 struct Params {
-    int num_grids = 5;       // grids [0, num_grids-1]
-    int nx = 32;             // grid points in x on coarsest level
-    int ny = 32;             // grid points in y on coarsest level
+    int num_grids = 6;       // grids [0, num_grids-1]
+    int nx = 16;             // grid points in x on coarsest level
+    int ny = 16;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
     double tol = 1e-6;       // convergence tolerance
     
     // number of 4th order stencil steps to do near end for fine resolution?
-    double iter = 128; // relaxation steps after/before prolongation/restriction
+    double iter = 2048; // relaxation steps after/before prolongation/restriction
 
     // lewey friedrich stabiilty thingy 
     // normally 0.25, but the W/x^2 term prefers 0.125

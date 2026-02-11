@@ -14,7 +14,7 @@ Grid::Grid() {
 
 void Grid::init(int i) {
     // numerical gridpoint stuff 
-    grid_n = i;
+    grid_n = (int) i;
     nx = (int) pow(2,grid_n) * p.nx;
     ny = (int) pow(2,grid_n) * p.ny;
     // cell centered
@@ -40,6 +40,7 @@ void Grid::init(int i) {
 
     // courant friendly timestep
     m_dt = p.CFL*std::min(dx,dy)*std::min(dx,dy);
+    m_SOR = 1.;
 }
 
 void Grid::ID_gaussian(double x0, double y0, double sig) {
@@ -195,8 +196,8 @@ void Grid::relax() {
             double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - src_psi;
 
             // timestep f_new = f_old + dt * df/dt
-            double new_W = W.get_data(i,j) + dW_dt * m_dt;
-            double new_psi = psi.get_data(i,j) + dpsi_dt * m_dt;
+            double new_W = W.get_data(i,j) + dW_dt * m_dt * m_SOR;
+            double new_psi = psi.get_data(i,j) + dpsi_dt * m_dt * m_SOR;
 
             // set new-data stage 
             W.set_new_data(new_W,i,j);

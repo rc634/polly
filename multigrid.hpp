@@ -44,6 +44,9 @@ public:
     // flush data down from fine level to coarse and back up to fine again
     void w_cycle();
 
+    // starts at low res then solves its way up with the threshold
+    void up_cycle(const double epsilon);
+
     // single relax step of fine grid
     void refine();
 

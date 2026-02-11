@@ -7,7 +7,7 @@ Field::Field() {
 
 void Field::init(int i) {
     // grid specific
-    grid_n = i;
+    grid_n = (int) i;
     nx = (int) pow(2,grid_n) * p.nx;
     ny = (int) pow(2,grid_n) * p.ny;
     // cell centered
@@ -30,8 +30,8 @@ void Field::init(int i) {
     // data arrays
     data.resize(n_flat,0.0);
     data_new.resize(n_flat,0.0);
-    rhs.resize(n_flat,0.0);
-    tau.resize(n_flat,0.0);
+    // rhs.resize(n_flat,0.0);
+    // tau.resize(n_flat,0.0);
 
     
 
