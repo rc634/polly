@@ -56,7 +56,7 @@ int main() {
     //     old_delta = new_delta;
     // }
 
-    for (int n=1; n<=25; n++) {
+    for (int n=1; n<=100; n++) {
         mg.w_cycle();
         std::cout << ">- WCYCLE " << n << " : ";
         std::cout << "integral W " << mg.fine_grid_ptr->int_W();
@@ -93,11 +93,11 @@ int main() {
 
 
 
-    for (int n=1; n<=100000; n++) {
+    for (int n=1; n<=600000; n++) {
         // lets goooooo!
 
         mg.refine();
-        
+
         if (n%10000==0) {
             std::cout << ">- REFINEMENT " << n << " : ";
             std::cout << "integral W " << mg.fine_grid_ptr->int_W();
