@@ -102,7 +102,7 @@ double Field::delta_data() {
     for (int k = 0; k < n_flat; k++) {
         out += pow(data[k] - data_new[k],2);
     }
-    return out;
+    return out/n_flat;
 }
 
 void Field::save_new_data() {

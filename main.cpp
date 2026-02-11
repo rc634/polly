@@ -15,19 +15,16 @@ int main() {
     double old_integral;
 
     mg.init();
-    mg.hello();
 
-    // v cycle controlls 
-    int i_top = mg.i_fine;
-    int i_bot = mg.i_coarse;
-    int n_trigger = 200;
+    // initial check
+    mg.hello();
 
     // set zeros for the solver to start from
     mg.initial_data();
     mg.save_data("g");
 
     // give it a tolerance
-    mg.up_cycle(10e-12);
+    mg.up_cycle(10e-18);
 
     mg.save_data("f");
 
