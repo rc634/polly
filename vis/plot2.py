@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
 data = np.loadtxt("../data/psi.dat", delimiter=",")
-data2 = np.loadtxt("../data/dataPsiDirichlet.csv", delimiter=",")
-data2 = np.transpose(data2)
+data2 = np.loadtxt("../data/W.dat", delimiter=",")
+# data2 = np.transpose(data2)
 
 norm = Normalize(vmin=-0.5, vmax=0.)
 
