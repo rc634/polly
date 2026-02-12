@@ -3,11 +3,13 @@
 #include "grid.hpp"
 #include "multigrid.hpp"
 #include "problem.hpp"
+#include "params.hpp"
 #include <cmath>
 
 
 int main() {
-
+    
+    Params p; 
     Multigrid mg;
 
     double old_delta;
@@ -24,7 +26,7 @@ int main() {
     mg.save_data("g");
 
     // give it a tolerance
-    mg.up_cycle(10e-18);
+    mg.up_cycle(p.tol);
 
     mg.save_data("f");
 

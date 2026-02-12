@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
 # load the data (comma-separated)
-data = np.loadtxt("../data/dataPsiDirichlet.csv", delimiter=",")
-data2 = np.loadtxt("../data/dataPsiNeumann.csv", delimiter=",")
-data = np.transpose(data)
-data2 = np.transpose(data2)
+data = np.loadtxt("../data/psi.dat", delimiter=",")
+data2 = np.loadtxt("../data/xi.dat", delimiter=",")
+# data = np.transpose(data)
+# data2 = np.transpose(data2)
 # norm = Normalize(vmin=-5, vmax=0.)
 
 # plt.imshow((((data-data2)/data2)), origin="lower", aspect="auto")#, norm=norm)

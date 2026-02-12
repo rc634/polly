@@ -41,6 +41,9 @@ void Grid::init(int i) {
     // courant friendly timestep
     m_dt = p.CFL*std::min(dx,dy)*std::min(dx,dy);
     m_SOR = 1.;
+    
+    // verbose 
+    std::cout << " - grid " << grid_n << " - dx = " << dx << "\n";
 }
 
 void Grid::ID_gaussian(double x0, double y0, double sig) {
@@ -174,8 +177,8 @@ void Grid::relax() {
             // source terms
             double src_psi = 0.; // psi source
             double src_W = 0.; // W source
-            double rho = 1.; // density source 
-            double omega = 0.1; // rotation source
+            double rho = 6.; // density source 
+            double omega = 0.0; // rotation source
             double packet = 0.; // overall shape of source 
 
             // if inside ellipse
