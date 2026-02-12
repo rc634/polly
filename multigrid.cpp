@@ -78,9 +78,12 @@ void Multigrid::flush() {
 void Multigrid::up_cycle(const double epsilon) {
     // output precision 
     std::cout << std::setprecision(8);
+    std::cout << "* -------------------*\n";
+    std::cout << "| STARTING UP CYCLE! |\n";
+    std::cout << "* -------------------*\n";
 
     // flush values down so that all levels are initialised
-    v_cycle(i_fine,i_coarse);
+    flush();
     double diff = 100.; // init large to be safe
     int count = 0;
     double sor = 1.; // over relax param 1-4 in theory

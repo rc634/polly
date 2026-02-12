@@ -68,6 +68,7 @@ public:
     void relax();
 
     void fill_all_ghosts();
+    void fill_all_ghosts_dirichlet();
 
     // save data 
     void save_data(const std::string& filename);

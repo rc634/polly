@@ -2,11 +2,11 @@
 #pragma once
 
 struct Params {
-    int num_grids = 4;       // grids [0, num_grids-1]
+    int num_grids = 5;       // grids [0, num_grids-1]
     int nx = 32;             // grid points in x on coarsest level
     int ny = 32;             // grid points in y on coarsest level
     int ng = 2;              // number of ghost cells per edge
-    double tol = 1e-12;       // convergence tolerance
+    double tol = 1e-14;       // convergence tolerance
     
     // number of 4th order stencil steps to do near end for fine resolution?
     double iter = 1024; // relaxation steps after/before prolongation/restriction
@@ -17,9 +17,9 @@ struct Params {
 
     // physical boundaries, upper lower
     double xL = 0.;
-    double xU = 120.;
+    double xU = 50.;
     double yL = 0.;
-    double yU = 120.;
+    double yU = 50.;
 
     // data saving
     int save_precision = 16;

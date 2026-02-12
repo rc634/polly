@@ -177,8 +177,8 @@ void Grid::relax() {
             // source terms
             double src_psi = 0.; // psi source
             double src_W = 0.; // W source
-            double rho = 6.; // density source 
-            double omega = 0.0; // rotation source
+            double rho = 1.; // density source 
+            double omega = 0.1; // rotation source
             double packet = 0.; // overall shape of source 
 
             // if inside ellipse
@@ -227,9 +227,12 @@ void Grid::relax() {
     fill_all_ghosts();
 }
 
-
+// newer mixed type boundary conditions based on asymptotic expansion
 void Grid::fill_all_ghosts() {
     // two ghosts thickness hard coded!
+
+    // warning only one thickness of ghost computed for outer!
+    // don't use 4th order stencils unless we fix that
 
     // loop left boundary -- symmetric
     for (int j = 0; j < nyg; j++) {
@@ -242,8 +245,126 @@ void Grid::fill_all_ghosts() {
         psi.set_new_data(psi.get_new_data(3,j),0,j);
         psi.set_new_data(psi.get_new_data(2,j),1,j);
     }
-    
-    // other boundaries are zero
+
+    // loop bottom boundary -- symetric 
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(W.get_data(i,2), i, 1);
+        W.set_data(W.get_data(i,3), i, 0);
+        W.set_new_data(W.get_new_data(i,2), i, 1);
+        W.set_new_data(W.get_new_data(i,3), i, 0);
+        psi.set_data(psi.get_data(i,2), i, 1);
+        psi.set_data(psi.get_data(i,3), i, 0);
+        psi.set_new_data(psi.get_new_data(i,2), i, 1);
+        psi.set_new_data(psi.get_new_data(i,3), i, 0);
+    }
+
+    // outer boundaries
+
+    // psi ~ 1 + M/2R   R is spherical radius
+
+    // W ~ J sin theta / R^2     where J is some kind of rotation magnitude constant
+
+    // declarations for mixed/robin bonudaries 
+    double x2 = 0.; // cylinder radius 
+    double y2 = 0.; // cylinder z
+    double x3 = 0.; // cylinder radius 
+    double y3 = 0.; // cylinder z
+    // 3 is inner ghost, 4 is outer ghost
+    double psi1 = 1., psi2 = 1., psi3 = 1., psi4 = 1.; 
+    double W1=0., W2=0., W3=0., W4=0.; 
+    int i4 = nxg-1, i3 = nxg-2, i2 = nxg-3, i1 = nxg-4;
+    int j4 = nyg-1, j3 = nyg-2, j2 = nyg-3, j1 = nyg-4;
+
+    // loop right boundary
+    //  - x const, partial x calculated
+    for (int j = 0; j < nyg; j++) {
+        // calculate values for mixed deriv conditions
+        x2 = W.get_x(i2,j);
+        y2 = W.get_y(i2,j);
+        x3 = W.get_x(i3,j);
+        y3 = W.get_y(i3,j);
+
+        psi1 = psi.get_data(i1,j); 
+        psi2 = psi.get_data(i2,j);
+        psi3 = psi1 - 2. * dx * x2 * (psi2-1.) / (x2*x2 + y2*y2);
+        psi4 = psi2 - 2. * dx * x3 * (psi3-1.) / (x3*x3 + y3*y3);
+
+        W1 = W.get_data(i1,j); 
+        W2 = W.get_data(i2,j);
+        W3 = W1 + 2. * dx * (y2*y2 - 2.*x2*x2) * W2 / (y2*y2*x2 + x2*x2*x2);
+        W4 = W2 + 2. * dx * (y3*y3 - 2.*x3*x3) * W3 / (y3*y3*x3 + x3*x3*x3);
+
+        // inner ghost
+        W.set_data(W3, i3, j);
+        W.set_new_data(W3, i3, j);
+        psi.set_data(psi3, i3, j);
+        psi.set_new_data(psi3, i3, j);
+        // outer ghost 
+        W.set_data(W4, i4, j);
+        W.set_new_data(W4, i4, j);
+        psi.set_data(psi4, i4, j);
+        psi.set_new_data(psi4, i4, j);
+    }
+
+    // loop top boundary
+    //  - y const, partial y calculated
+    for (int i = 0; i < nxg; i++) {
+        // calculate values for mixed deriv conditions
+        x2 = W.get_x(i,j2);
+        y2 = W.get_y(i,j2);
+        x3 = W.get_x(i,j3);
+        y3 = W.get_y(i,j3);
+
+        psi1 = psi.get_data(i,j1); 
+        psi2 = psi.get_data(i,j2);
+        psi3 = psi1 - 2. * dx * x2 * (psi2-1.) / (x2*x2 + y2*y2);
+        psi4 = psi2 - 2. * dx * x3 * (psi3-1.) / (x3*x3 + y3*y3);
+
+        W1 = W.get_data(i,j1); 
+        W2 = W.get_data(i,j2);
+        W3 = W1 - 6. * dy * y2 * W2 / (y2*y2 + x2*x2);
+        W4 = W2 - 6. * dy * y3 * W3 / (y3*y3 + x3*x3);
+
+        // inner ghost 
+        W.set_data(W3, i, j3);
+        W.set_new_data(W3, i, j3);
+        psi.set_data(psi3, i, j3);
+        psi.set_new_data(psi3, i, j3);
+        // outer ghost 
+        W.set_data(W4, i, j4);
+        W.set_new_data(W4, i, j4);
+        psi.set_data(psi4, i, j4);
+        psi.set_new_data(psi4, i, j4);
+    }
+
+}
+
+void Grid::fill_all_ghosts_dirichlet() {
+
+
+    // loop left boundary -- symmetric
+    for (int j = 0; j < nyg; j++) {
+        W.set_data(W.get_data(3,j),0,j);
+        W.set_data(W.get_data(2,j),1,j);
+        W.set_new_data(W.get_new_data(3,j),0,j);
+        W.set_new_data(W.get_new_data(2,j),1,j);
+        psi.set_data(psi.get_data(3,j),0,j);
+        psi.set_data(psi.get_data(2,j),1,j);
+        psi.set_new_data(psi.get_new_data(3,j),0,j);
+        psi.set_new_data(psi.get_new_data(2,j),1,j);
+    }
+
+    // loop bottom boundary -- symetric 
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(W.get_data(i,2), i, 1);
+        W.set_data(W.get_data(i,3), i, 0);
+        W.set_new_data(W.get_new_data(i,2), i, 1);
+        W.set_new_data(W.get_new_data(i,3), i, 0);
+        psi.set_data(psi.get_data(i,2), i, 1);
+        psi.set_data(psi.get_data(i,3), i, 0);
+        psi.set_new_data(psi.get_new_data(i,2), i, 1);
+        psi.set_new_data(psi.get_new_data(i,3), i, 0);
+    }
 
     // loop right boundary
     for (int j = 0; j < nyg; j++) {
@@ -256,6 +377,7 @@ void Grid::fill_all_ghosts() {
         psi.set_new_data(1., nxg-2, j);
         psi.set_new_data(1., nxg-1, j);
     }
+
     // loop top boundary
     for (int i = 0; i < nxg; i++) {
         W.set_data(0., i, nyg-2);
@@ -266,17 +388,6 @@ void Grid::fill_all_ghosts() {
         psi.set_data(1., i, nyg-1);
         psi.set_new_data(1., i, nyg-2);
         psi.set_new_data(1., i, nyg-1);
-    }
-    // loop bottom boundary -- symetric 
-    for (int i = 0; i < nxg; i++) {
-        W.set_data(W.get_data(i,2), i, 1);
-        W.set_data(W.get_data(i,3), i, 0);
-        W.set_new_data(W.get_new_data(i,2), i, 1);
-        W.set_new_data(W.get_new_data(i,3), i, 0);
-        psi.set_data(psi.get_data(i,2), i, 1);
-        psi.set_data(psi.get_data(i,3), i, 0);
-        psi.set_new_data(psi.get_new_data(i,2), i, 1);
-        psi.set_new_data(psi.get_new_data(i,3), i, 0);
     }
 }
 
