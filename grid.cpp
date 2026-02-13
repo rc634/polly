@@ -167,8 +167,8 @@ void Grid::relax() {
             double dWdy = W.d1y(i,j);
 
             // source stats -- const elipsoid
-            double height = 1.;
-            double width = 1.; 
+            double height = 0.4;
+            double width = 5.0; 
             // fractional coords wrt ellipsoid
             double xf = x/width;
             double yf = y/height;
@@ -177,8 +177,8 @@ void Grid::relax() {
             // source terms
             double src_psi = 0.; // psi source
             double src_W = 0.; // W source
-            double rho = 1.; // density source 
-            double omega = 0.1; // rotation source
+            double rho = 5.; // density source 
+            double omega = 50.; // rotation source
             double packet = 0.; // overall shape of source 
 
             // if inside ellipse
@@ -234,19 +234,19 @@ void Grid::fill_all_ghosts() {
     // warning only one thickness of ghost computed for outer!
     // don't use 4th order stencils unless we fix that
 
-    // loop left boundary -- symmetric
+    // loop left boundary -- symmetric psi, antisymmetric W
     for (int j = 0; j < nyg; j++) {
-        W.set_data(W.get_data(3,j),0,j);
-        W.set_data(W.get_data(2,j),1,j);
-        W.set_new_data(W.get_new_data(3,j),0,j);
-        W.set_new_data(W.get_new_data(2,j),1,j);
+        W.set_data(-W.get_data(3,j),0,j);
+        W.set_data(-W.get_data(2,j),1,j);
+        W.set_new_data(-W.get_new_data(3,j),0,j);
+        W.set_new_data(-W.get_new_data(2,j),1,j);
         psi.set_data(psi.get_data(3,j),0,j);
         psi.set_data(psi.get_data(2,j),1,j);
         psi.set_new_data(psi.get_new_data(3,j),0,j);
         psi.set_new_data(psi.get_new_data(2,j),1,j);
     }
 
-    // loop bottom boundary -- symetric 
+    // loop bottom boundary -- symmetric psi and W
     for (int i = 0; i < nxg; i++) {
         W.set_data(W.get_data(i,2), i, 1);
         W.set_data(W.get_data(i,3), i, 0);

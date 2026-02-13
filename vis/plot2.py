@@ -6,10 +6,9 @@ from matplotlib.colors import Normalize
 data = np.loadtxt("../data/psi.dat", delimiter=",")
 data2 = np.loadtxt("../data/W.dat", delimiter=",")
 
-# Normalization (optional)
+# Optional normalization
 norm = Normalize(vmin=-0.5, vmax=0.)
 
-# Create subplots
 fig, axes = plt.subplots(
     2, 1,
     sharex=True,
@@ -18,18 +17,27 @@ fig, axes = plt.subplots(
     constrained_layout=True
 )
 
-# First image
-im1 = axes[0].imshow(np.log10(np.abs(data-1)), origin="lower", aspect="auto")#, norm=norm)
+# First image (e.g. plasma)
+im1 = axes[0].imshow(
+    np.log10(np.abs(data - 1)),
+    origin="lower",
+    aspect="auto",
+    cmap="rainbow"      # <-- colormap 1
+    # norm=norm
+)
 axes[0].set_title("log10|psi-1|.dat")
-# Add colorbar for the first subplot
-cbar1 = fig.colorbar(im1, ax=axes[0], label="Value (0–1)")
+cbar1 = fig.colorbar(im1, ax=axes[0], label="Value")
 
-# Second image
-im2 = axes[1].imshow(np.log10(np.abs(data2)), origin="lower", aspect="auto")#, norm=norm)
+# Second image (e.g. viridis)
+im2 = axes[1].imshow(
+    np.log10(np.abs(data2+10e-25)),
+    origin="lower",
+    aspect="auto",
+    cmap="rainbow"     # <-- colormap 2
+    # norm=norm
+)
 axes[1].set_title("log10|W|.dat")
 axes[1].set_xlabel("Column index")
-# Add colorbar for the second subplot
-cbar2 = fig.colorbar(im2, ax=axes[1], label="Value (0–1)")
+cbar2 = fig.colorbar(im2, ax=axes[1], label="Value")
 
 plt.show()
-

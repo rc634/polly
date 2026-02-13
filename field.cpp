@@ -147,7 +147,7 @@ void Field::hello() {
 // calculus 
 double Field::d1x(int i, int j) {
     // stencil loading 
-    const auto& stencil = fd::d1_central_2;
+    const auto& stencil = fd::d1_central_4;
 
     // perform stencil deriv
     double deriv = 0.0;
@@ -161,7 +161,7 @@ double Field::d1x(int i, int j) {
 
 double Field::d1y(int i, int j) {
     // stencil loading 
-    const auto& stencil = fd::d1_central_2;
+    const auto& stencil = fd::d1_central_4;
 
     // perform stencil deriv
     double deriv = 0.0;
@@ -175,7 +175,7 @@ double Field::d1y(int i, int j) {
 
 double Field::d2x(int i, int j) {
     // stencil loading 
-    const auto& stencil = fd::d2_central_2;
+    const auto& stencil = fd::d2_central_4;
 
     // perform stencil deriv
     double deriv = 0.0;
@@ -189,7 +189,7 @@ double Field::d2x(int i, int j) {
 
 double Field::d2y(int i, int j) {
     // stencil loading 
-    const auto& stencil = fd::d2_central_2;
+    const auto& stencil = fd::d2_central_4;
 
     // perform stencil deriv
     double deriv = 0.0;
@@ -205,7 +205,7 @@ double Field::cartesian_laplacian(int i, int j) {
     return d2x(i,j) + d2y(i,j);
 }
 
-double Field::cylindrical_laplacian(int i, int j, double x) {
+double Field::cylindrical_laplacian_bad(int i, int j, double x) {
     double lap_y = d2y(i,j); // cartesian like z coord
     double f0 = get_data(i-1,j);
     double f1 = get_data(i,j);
@@ -214,6 +214,6 @@ double Field::cylindrical_laplacian(int i, int j, double x) {
     return lap_y + lap_x_curvilinear;
 }
 
-double Field::cylindrical_laplacian_bad(int i, int j, double x) {
+double Field::cylindrical_laplacian(int i, int j, double x) {
     return d2x(i,j) + d2y(i,j) + d1x(i,j)/x;
 }

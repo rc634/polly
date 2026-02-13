@@ -102,10 +102,10 @@ void Multigrid::up_cycle(const double epsilon) {
             {
                 grids[i].relax();
             }
-            sor = sor + 0.2 * (sor_max-sor);
+            // sor = sor + 0.2 * (sor_max-sor); // this can bug out, but can be fast
             diff = abs(grids[i].m_delta);
             if (diff < epsilon) break;
-            std::cout << " * " << count * p.iter << " - diff : " << diff << "\n";
+            std::cout << " ["<<i<<"/"<<i_fine<<"] - " << count * p.iter << " - diff : " << diff << "\n";
             std::cout << " - ~ CFL : " << p.CFL*sor << "\n";
             std::cout << " - ~ int W = " << grids[i].int_W() 
                       << ", int psi = " << grids[i].int_psi() << "\n";
