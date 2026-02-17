@@ -17,9 +17,9 @@ struct Params {
 
     // physical boundaries, upper lower
     double xL = 0.;
-    double xU = 20.;
+    double xU = 200.;
     double yL = 0.;
-    double yU = 20.;
+    double yU = 200.;
 
     // data saving
     int save_precision = 16;

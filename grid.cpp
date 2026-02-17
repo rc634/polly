@@ -168,7 +168,7 @@ void Grid::relax() {
 
             // source stats -- const elipsoid
             double height = 0.4;
-            double width = 5.0; 
+            double width = 2.0; 
             // fractional coords wrt ellipsoid
             double xf = x/width;
             double yf = y/height;
@@ -177,8 +177,8 @@ void Grid::relax() {
             // source terms
             double src_psi = 0.; // psi source
             double src_W = 0.; // W source
-            double rho = 5.; // density source 
-            double omega = 50.; // rotation source
+            double rho = 4.; // density source 
+            double omega = 1.; // rotation source
             double packet = 0.; // overall shape of source 
 
             // if inside ellipse
@@ -186,7 +186,7 @@ void Grid::relax() {
                 packet = 1 + cos(rf * pi);
                 packet *= packet;
                 src_W = 8. * pi * x * rho * omega * packet;
-                src_psi = -2. * pi * rho * packet;
+                src_psi = - 2. * pi * rho * packet;
             }
             src_W += Wij/x/x;
             src_psi += - 0.5 * pow(psij,-7) * (
