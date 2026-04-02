@@ -94,5 +94,5 @@ public:
     double d2y(int i, int j);
     double cartesian_laplacian(int i, int j);
     double cylindrical_laplacian(int i, int j, double x);
-    double cylindrical_laplacian_bad(int i, int j, double x);
+    double cylindrical_laplacian_HC(int i, int j, double x);
 };

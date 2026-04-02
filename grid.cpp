@@ -40,7 +40,12 @@ void Grid::init(int i) {
 
     // courant friendly timestep
     m_dt = p.CFL*std::min(dx,dy)*std::min(dx,dy);
-    m_SOR = 1.;
+    m_UR = 1.; // real dt = m_dt * m_UR
+
+    // matter source stuff
+    // analytic: 
+    // gets over-ridden if we read from file 
+    m_source.init_analytic(nxg, nyg, ng, dx, dy, p.xL, p.yL);
     
     // verbose 
     std::cout << " - grid " << grid_n << " - dx = " << dx << "\n";
@@ -117,6 +122,18 @@ double Grid::field_integral() {
     return integral;
 }
 
+double Grid::max_psi() {
+    double psi_max = 0.;
+    double psi_ij = 0.;
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            psi_ij = std::abs(psi.get_data(i,j));
+            if (psi_ij > psi_max) psi_max = psi_ij;
+        }
+    }
+    return psi_max;
+}
+
 double Grid::int_W() {
     // can add metrics if wanted 
     double integral = 0.;
@@ -161,46 +178,31 @@ void Grid::relax() {
             double r = sqrt(x*x + y*y);
 
             // field values 
-            double Wij = W.get_data(i,j);
+            double Wij  = W.get_data(i,j);
             double psij = psi.get_data(i,j);
             double dWdx = W.d1x(i,j);
             double dWdy = W.d1y(i,j);
 
-            // source stats -- const elipsoid
-            double height = 0.2;
-            double width = 2.2; 
-            // fractional coords wrt ellipsoid
-            double xf = x/width;
-            double yf = y/height;
-            double rf = sqrt(xf*xf + yf*yf);
+            // get sources, effective or raw 
+            double src_W   = m_source.get_src_W(i,j,x,psij);
+            double src_psi = m_source.get_src_psi(i,j,x,psij);
 
-            // source terms
-            double src_psi = 0.; // psi source
-            double src_W = 0.; // W source
-            double rho = 4.; // density source 
-            double omega = 10.; // rotation source
-            double packet = 0.; // overall shape of source 
-
-            // if inside ellipse
-            if (xf*xf + yf*yf < 1.) {
-                packet = 1 + cos(rf * pi);
-                packet *= packet;
-                src_W = 8. * pi * x * rho * omega * packet;
-                src_psi = - 2. * pi * rho * packet;
-            }
-            src_W += Wij/x/x;
-            src_psi += - 0.5 * pow(psij,-7) * (
+            // non-flat-laplacian terms from PDE's
+            double geom_W   = Wij/x/x;
+            double geom_psi = - 0.5 * pow(psij,-7) * (
                 dWdy*dWdy + dWdx*dWdx 
                 - 2.*dWdx*Wij/x + Wij*Wij/x/x
             );
 
             // poisson eqaution
-            double dW_dt = W.cylindrical_laplacian(i,j,x) - src_W;
-            double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - src_psi;
+            double dW_dt   = W.cylindrical_laplacian(i,j,x) - geom_W - src_W;
+            double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - geom_psi - src_psi;
+            // double dW_dt   = W.cylindrical_laplacian_HC(i,j,x) - geom_W - src_W;
+            // double dpsi_dt = psi.cylindrical_laplacian_HC(i,j,x) - geom_psi - src_psi;
 
             // timestep f_new = f_old + dt * df/dt
-            double new_W = W.get_data(i,j) + dW_dt * m_dt * m_SOR;
-            double new_psi = psi.get_data(i,j) + dpsi_dt * m_dt * m_SOR;
+            double new_W   = W.get_data(i,j) + dW_dt * m_dt * m_UR;
+            double new_psi = psi.get_data(i,j) + dpsi_dt * m_dt * m_UR;
 
             // set new-data stage 
             W.set_new_data(new_W,i,j);
@@ -473,6 +475,9 @@ void Grid::save_state() {
 
     file1.close();
     file2.close();
+
+    // save into ./data/
+    m_source.save("data", ng, psi);
 }
 
 

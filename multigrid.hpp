@@ -60,4 +60,8 @@ public:
     // prolongate : coarse -> fine
     // promises not to modify coarse
     void prolongate_up(const Grid &coarse, Grid &fine);
+
+
+    // sources
+    void restrict_source_down(const Grid& fine, Grid& coarse);
 };

@@ -16,7 +16,8 @@ int main() {
     double new_delta;
     double old_integral;
 
-    mg.init();
+    // automatically handles wether analytic source or not
+    mg.init(); 
 
     // initial check
     mg.hello();

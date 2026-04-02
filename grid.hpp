@@ -2,6 +2,7 @@
 #include <iostream>
 #include "field.hpp"
 #include "params.hpp"
+#include "source.hpp"
 
 class Grid {
 public:
@@ -37,6 +38,9 @@ public:
     Field W;
     Field psi;
 
+    // matter source object
+    Source m_source;
+
     // place in heirarchy
     int grid_n; 
 
@@ -45,7 +49,7 @@ public:
 
     // the effective timestep
     double m_dt;
-    double m_SOR; // successive over relax
+    double m_UR; // under-relaxation, to account for sources
 
     // error or delta 
     double m_delta;
@@ -59,6 +63,9 @@ public:
     void ID_zeros();
 
     void ID_pdisc(double R, double density);
+
+    // returns max value of psi for courant time step stuff
+    double max_psi();
 
     double field_integral();
     double int_W();

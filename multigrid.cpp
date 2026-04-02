@@ -17,6 +17,30 @@ void Multigrid::init() {
     // copy over finest grid 
     fine_grid_ptr = &grids[p.num_grids-1];
     coarse_grid_ptr = &grids[0];
+
+    if (!Source::ANALYTIC) {
+        // overwrite all levels with tabulated source from file
+        Grid& fg = grids[i_fine];
+        fg.m_source.init_from_file("data/source-W.dat", "data/source-psi.dat",
+                                    fg.nxg, fg.nyg, fg.ng);
+        for (int i = i_fine; i > (int)i_coarse; i--)
+            restrict_source_down(grids[i], grids[i-1]);
+    }
+}
+
+void Multigrid::restrict_source_down(const Grid& fine, Grid& coarse) {
+    for (int j = coarse.jmin; j < coarse.jmax; j++) {
+        for (int i = coarse.imin; i < coarse.imax; i++) {
+            int i1 = i*2 - p.ng, i2 = i*2 - p.ng + 1;
+            int j1 = j*2 - p.ng, j2 = j*2 - p.ng + 1;
+            coarse.m_source.set_v(i, j,
+                0.25 * (fine.m_source.get_v(i1,j1) + fine.m_source.get_v(i2,j1) +
+                        fine.m_source.get_v(i1,j2) + fine.m_source.get_v(i2,j2)));
+            coarse.m_source.set_rho(i, j,
+                0.25 * (fine.m_source.get_rho(i1,j1) + fine.m_source.get_rho(i2,j1) +
+                        fine.m_source.get_rho(i1,j2) + fine.m_source.get_rho(i2,j2)));
+        }
+    }
 }
 
 void Multigrid::fill_all_ghosts() {
@@ -69,58 +93,166 @@ void Multigrid::flush() {
     }
 }
 
+// /////////////////////////////
+// // UP CYCLE 
+
+// // solves from bottom grid up
+// // satisfies accuracy criterion on each grid advancement
+
+// void Multigrid::up_cycle(const double epsilon) {
+//     // output precision 
+//     std::cout << std::setprecision(8);
+//     std::cout << "* -------------------*\n";
+//     std::cout << "| STARTING UP CYCLE! |\n";
+//     std::cout << "* -------------------*\n";
+
+//     // flush values down so that all levels are initialised
+//     flush();
+//     double diff = 100.; // init large to be safe
+//     int count = 0;
+//     double sor = 1.; // over relax param 1-4 in theory
+//     double sor_max = 1.5; // in practice max to this!
+//     double global_alpha = 1.; // global source blend knob
+//     // loop up through all grids
+//     for (size_t i = i_coarse; i <= i_fine; i++)
+//     {
+//         // lazy boi
+//         grids[i].fill_all_ghosts();
+//         count = 0;
+
+//         std::cout << "Entering Grid Number " << i << std::endl;
+//         while (true) {
+//             grids[i].m_source.m_alpha = global_alpha;
+//             grids[i].m_SOR = sor;
+//             for (int q = 0; q<p.iter; q++)
+//             {
+//                 grids[i].relax();
+//             }
+//             // sor = sor + 0.2 * (sor_max-sor); // this can bug out, but can be fast
+//             diff = abs(grids[i].m_delta);
+//             if (diff < epsilon) break;
+//             std::cout << " ["<<i<<"/"<<i_fine<<"] - " << count * p.iter << " - diff : " << diff << "\n";
+//             std::cout << " - ~ CFL : " << p.CFL*sor << "\n";
+//             std::cout << " - ~ int W = " << grids[i].int_W() 
+//                       << ", int psi = " << grids[i].int_psi() << "\n";
+//             std::cout << " - ~ alpha-blend : " << grids[i].m_source.m_alpha << "\n";
+//             std::cout << " * - ~ - ~ - \n";
+//             count += 1;
+//         }
+
+//         // this creates noise! need to smooth before cranking over relaxation!
+//         if (i!=i_fine) {
+//             prolongate_up(grids[i],grids[i+1]);
+//         }
+//         // reset sor
+//         sor = 1.;
+//     }
+// }
+
+
+
+
+
+
 /////////////////////////////
 // UP CYCLE 
 
-// solves from bottom grid up
-// satisfies accuracy criterion on each grid advancement
-
 void Multigrid::up_cycle(const double epsilon) {
-    // output precision 
     std::cout << std::setprecision(8);
-    std::cout << "* -------------------*\n";
-    std::cout << "| STARTING UP CYCLE! |\n";
-    std::cout << "* -------------------*\n";
 
-    // flush values down so that all levels are initialised
+    auto hline = [](char c, int n) { std::cout << std::string(n, c) << "\n"; };
+
+    hline('=', 52);
+    std::cout << "  UP CYCLE\n";
+    hline('=', 52);
+
     flush();
-    double diff = 100.; // init large to be safe
-    int count = 0;
-    double sor = 1.; // over relax param 1-4 in theory
-    double sor_max = 1.5; // in practice max to this!
-    // loop up through all grids
+    double diff  = 100.;
+    int    count = 0;
+    double psi4_max_global = 1.;
+    double vmax_global = 0.;
+    double rhomax_global = 0.;
+    double cfl_mod = 1.;
+
     for (size_t i = i_coarse; i <= i_fine; i++)
     {
-        // lazy boi
         grids[i].fill_all_ghosts();
         count = 0;
 
-        std::cout << "Entering Grid Number " << i << std::endl;
+        hline('-', 52);
+        std::cout << "  GRID " << i << " / " << i_fine;
+        if      (i == i_coarse) std::cout << "   [coarse]";
+        else if (i == i_fine)   std::cout << "   [fine]";
+        else                    std::cout << "   [intermediate]";
+        std::cout << "\n";
+        hline('-', 52);
+
         while (true) {
-            grids[i].m_SOR = sor;
-            for (int q = 0; q<p.iter; q++)
+
+            // multiple consecutive relaxations
+            for (int q = 0; q < p.iter; q++) 
             {
+                psi4_max_global = std::pow(grids[i].max_psi(),4);
+                rhomax_global = grids[i].m_source.max_rho();
+                vmax_global = grids[i].m_source.max_v();
+                cfl_mod = rhomax_global * 2. * M_PI 
+                        * 5. * psi4_max_global;
+                cfl_mod = std::max(1.,cfl_mod);
+                cfl_mod = 1.;
+                grids[i].m_UR = 1./cfl_mod;
                 grids[i].relax();
             }
-            // sor = sor + 0.2 * (sor_max-sor); // this can bug out, but can be fast
-            diff = abs(grids[i].m_delta);
-            if (diff < epsilon) break;
-            std::cout << " ["<<i<<"/"<<i_fine<<"] - " << count * p.iter << " - diff : " << diff << "\n";
-            std::cout << " - ~ CFL : " << p.CFL*sor << "\n";
-            std::cout << " - ~ int W = " << grids[i].int_W() 
-                      << ", int psi = " << grids[i].int_psi() << "\n";
-            std::cout << " * - ~ - ~ - \n";
+
+            // double stiffness = 10. * M_PI * std::pow(grids[i].max_psi(), 4) * rhomax_global;
+            // double dt_used   = grids[i].m_dt * grids[i].m_UR;
+            // std::cout << "  stiffness*dt = " << stiffness * dt_used << "\n";
+
+            diff = std::abs(grids[i].m_delta);
+            if (diff < epsilon) {
+                std::cout << "  converged after " << count * p.iter 
+                          << " iterations  [diff = " << diff << "]\n";
+                break;
+            }
+
+            // progress line
+            // bar width scales with log convergence
+            int bar_width = 20;
+            double frac = std::log10(diff / epsilon);          // >0 means not converged
+            frac = std::max(0., std::min(1., 1. - frac / 6.)); // normalise over ~6 decades
+            int filled = static_cast<int>(frac * bar_width);
+            std::string bar = std::string(filled, '#') + std::string(bar_width - filled, '.');
+
+            // printing to terminal
+            double iW  = grids[i].int_W();
+            double iP  = grids[i].int_psi();
+            std::cout << "  " << count * p.iter
+                    << " it  [" << bar << "]"
+                    << "  diff "    << std::scientific << std::setw(11) << diff
+                    << std::fixed   << std::setprecision(3)
+                    << "  cfl "     << p.CFL / cfl_mod
+                    << "  cfl_mod " << std::setprecision(5) << cfl_mod
+                    << "  intW "    << iW
+                    << "  intp "    << iP
+                    << "\n";
+
             count += 1;
         }
 
-        // this creates noise! need to smooth before cranking over relaxation!
-        if (i!=i_fine) {
-            prolongate_up(grids[i],grids[i+1]);
+        if (i != i_fine) {
+            std::cout << "  prolongating to grid " << i + 1 << " ...\n";
+            prolongate_up(grids[i], grids[i + 1]);
         }
-        // reset sor
-        sor = 1.;
     }
+
+    hline('=', 52);
+    std::cout << "  UP CYCLE COMPLETE\n";
+    hline('=', 52);
+    std::cout << "\n";
 }
+
+
+
+
 
 /////////////////////////////
 // V CYCLE 

@@ -205,7 +205,8 @@ double Field::cartesian_laplacian(int i, int j) {
     return d2x(i,j) + d2y(i,j);
 }
 
-double Field::cylindrical_laplacian_bad(int i, int j, double x) {
+// hard coded 2nd order curvilinear
+double Field::cylindrical_laplacian_HC(int i, int j, double x) {
     double lap_y = d2y(i,j); // cartesian like z coord
     double f0 = get_data(i-1,j);
     double f1 = get_data(i,j);
