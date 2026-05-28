@@ -57,10 +57,10 @@ private:
     int flat(int i, int j) const { return j * m_nxg + i; }
 
     // analytic source parameters
-    const double m_rho_0  = 2.;  // density
-    const double m_v_0    = 0.3; // v_phi
-    const double m_height = 2.;
-    const double m_width  = 2.;
+    const double m_rho_0  = 6.;  // density
+    const double m_v_0    = 3.0; // v_phi
+    const double m_height = 1.;
+    const double m_width  = 1.;
 };
 
 

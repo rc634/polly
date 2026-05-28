@@ -32,12 +32,12 @@ void Source::init_analytic(int nxg, int nyg, int ng,
             double rf     = std::sqrt(xf*xf + yf*yf);
             // packet encoding overall compact support
             double packet = 0.;
-            double GERRY = 3.;
+            double GERRY = sqrt(3.);
 
             if (xf*xf + yf*yf < 1.) {
                 // double env    = 1. + std::cos(rf * M_PI);
                 // packet = env * env / 4.; //normalise to packet(0)=1
-                packet = exp(GERRY + GERRY/(rf*rf-1.));
+                packet = exp(GERRY*GERRY*rf*rf/(rf*rf-1.));
             }
 
             m_v[flat(i,j)]   = m_v_0;  // raw v
