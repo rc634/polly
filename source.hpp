@@ -46,7 +46,7 @@ public:
     double max_rho() const;
     double max_v() const;
 
-    // Save to source-W.dat / source-psi.dat (same format as grid.cpp save_state)
+    // Save to dat
     void save(const std::string& out_dir, int ng, const Field& psi_field) const;
 
 private:
@@ -57,10 +57,10 @@ private:
     int flat(int i, int j) const { return j * m_nxg + i; }
 
     // analytic source parameters
-    const double m_rho_0  = 6.;  // density
-    const double m_v_0    = 3.0; // v_phi
-    const double m_height = 1.;
-    const double m_width  = 1.;
+    const double m_rho_0  = 4.0;  // density
+    const double m_v_0    = 1.;// 10.0; // v_phi
+    const double m_height = 0.5;
+    const double m_width  = sqrt(2.);
 };
 
 
