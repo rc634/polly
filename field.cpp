@@ -99,6 +99,7 @@ double Field::delta_data() {
     // loop all cells including ghosts
     // flattened array type loop
     double out = 0.0;
+    #pragma omp parallel for reduction(+:out)
     for (int k = 0; k < n_flat; k++) {
         out += pow(data[k] - data_new[k],2);
     }

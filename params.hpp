@@ -1,5 +1,6 @@
 // params.hpp
 #pragma once
+#include <string>
 
 struct Params {
     int num_grids = 6;       // grids [0, num_grids-1]
@@ -23,6 +24,7 @@ struct Params {
 
     // data saving
     int save_precision = 16;
+    std::string out_dir = "data";
 };
 
 // notes 

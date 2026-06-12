@@ -125,6 +125,7 @@ double Grid::field_integral() {
 double Grid::max_psi() {
     double psi_max = 0.;
     double psi_ij = 0.;
+    #pragma omp parallel for reduction(max:psi_max)
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
             psi_ij = std::abs(psi.get_data(i,j));
@@ -164,7 +165,8 @@ double Grid::int_psi() {
 void Grid::relax() {
     // One Relaxation step 
     
-    // loop over all live cells 
+    // loop over all live cells
+    #pragma omp parallel for schedule(static)
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
             // time evolution step
@@ -395,7 +397,7 @@ void Grid::fill_all_ghosts_dirichlet() {
 
 
 void Grid::save_data(const std::string& filename) {
-    std::string path = "data/" + filename + ".dat";
+    std::string path = p.out_dir + "/" + filename + ".dat";
     std::ofstream file(path);
 
     if (!file) {
@@ -431,9 +433,9 @@ void Grid::save_data(const std::string& filename) {
 }
 
 void Grid::save_state() {
-    std::string path1 = "data/W.dat";
+    std::string path1 = p.out_dir + "/W.dat";
     std::ofstream file1(path1);
-    std::string path2 = "data/psi.dat";
+    std::string path2 = p.out_dir + "/psi.dat";
     std::ofstream file2(path2);
 
     if (!file1) {
@@ -477,7 +479,7 @@ void Grid::save_state() {
     file2.close();
 
     // save into ./data/
-    m_source.save("data", ng, psi);
+    m_source.save(p.out_dir, ng, psi);
 }
 
 

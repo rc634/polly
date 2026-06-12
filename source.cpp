@@ -40,8 +40,8 @@ void Source::init_analytic(int nxg, int nyg, int ng,
                 packet = exp(GERRY*GERRY*rf*rf/(rf*rf-1.));
             }
 
-            m_v[flat(i,j)]   = m_v_0;  // raw v
-            m_rho[flat(i,j)] = m_rho_0 * packet;  // raw rho
+            m_v[flat(i,j)]   = m_v_0;
+            m_rho[flat(i,j)] = m_rho_0 * packet;
         }
     }
 

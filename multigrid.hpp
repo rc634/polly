@@ -8,7 +8,7 @@ class Multigrid {
 public:
     Params p;
 
-    // set of grids 
+    // set of grids
     std::vector<Grid> grids;
 
     // pointer to finest grid

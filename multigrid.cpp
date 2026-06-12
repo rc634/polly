@@ -339,6 +339,7 @@ void Multigrid::restrict_down(const Grid &fine, Grid &coarse) {
     int i2 = 0;
     int j1 = 0;
     int j2 = 0;
+    #pragma omp parallel for schedule(static) private(i1,i2,j1,j2,valW,valPsi)
     for (int j = coarse.jmin; j < coarse.jmax; j++) {
         for (int i = coarse.imin; i < coarse.imax; i++) {
             // fine indices
@@ -370,6 +371,7 @@ void Multigrid::prolongate_up(const Grid &coarse, Grid &fine) {
     double y = 0.;
     double valW = 0.;
     double valPsi = 0.;
+    #pragma omp parallel for schedule(static) private(x,y,valW,valPsi)
     for (int j = fine.jmin; j < fine.jmax; j++) {
         for (int i = fine.imin; i < fine.imax; i++) {
 
