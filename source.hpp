@@ -11,11 +11,13 @@ public:
     static constexpr bool EFFECTIVE_RHO = true;
     static constexpr bool EFFECTIVE_V = true;
 
-    // Init by evaluating analytic source onto grid
-    // Requires ghost-inclusive grid dimensions and cell-centre coordinate info
-    void init_analytic(int nxg, int nyg, int ng,
-                       double dx, double dy,
-                       double xL, double yL);
+    void init_bump(int nxg, int nyg, int ng,
+                   double dx, double dy,
+                   double xL, double yL);
+
+    void init_SJ(int nxg, int nyg, int ng,
+                 double dx, double dy,
+                 double xL, double yL);
 
     // Init by loading source-W.dat and source-psi.dat
     void init_from_file(const std::string& W_path, const std::string& psi_path,
@@ -42,6 +44,10 @@ public:
     void set_v(int i, int j, double val)   { m_v[flat(i,j)]   = val; }
     void set_rho(int i, int j, double val) { m_rho[flat(i,j)] = val; }
 
+    // ADM mass from integrating effective source over flat space
+    // M_ADM = 2π ∫∫ ρ_eff · x dx dy   (exact for conformally flat Hamiltonian constraint)
+    double m_M_ADM = 0.;
+
     // max value finders for courant
     double max_rho() const;
     double max_v() const;
@@ -49,23 +55,34 @@ public:
     // Save to dat
     void save(const std::string& out_dir, int ng, const Field& psi_field) const;
 
-    void set_source_params(double rho_0, double v_0, double height, double width) {
-        m_rho_0  = rho_0;
-        m_v_0    = v_0;
-        m_height = height;
-        m_width  = width;
+    // rotation profile types for m_v
+    static constexpr int ROT_FLAT       = 0; // uniform Omega
+    static constexpr int ROT_FAST_CRUST = 1; // Omega ~ rf  (slow core, fast crust)
+    static constexpr int ROT_FAST_CORE  = 2; // Omega ~ 1 - rf (fast core, slow crust)
+
+    void set_source_params(double rho_0, double v_0, double height, double width, int rotation_type = ROT_FLAT) {
+        m_rho_0         = rho_0;
+        m_v_0           = v_0;
+        m_height        = height;
+        m_width         = width;
+        m_rotation_type = rotation_type;
     }
 
 private:
-    double m_rho_0  = 4.0;
-    double m_v_0    = 1.0;
-    double m_height = 0.5;
-    double m_width  = sqrt(2.);
+    double m_rho_0  =  12.0;// 4.0; // 3.4;
+    double m_v_0    = 0.4;
+    double m_height = 4.; // 0.5;
+    double m_width  = 0.5; // sqrt(2.);
+    int m_rotation_type = ROT_FAST_CORE;
     std::vector<double> m_v; // source rotation array
     std::vector<double> m_rho; // source density array
     int m_nxg = 0;
     int m_nyg = 0;
+    int m_ng  = 0;
+    double m_dx = 0., m_dy = 0., m_xL = 0.;
     int flat(int i, int j) const { return j * m_nxg + i; }
+
+    void integrate_M_ADM();
 };
 
 

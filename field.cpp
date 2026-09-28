@@ -95,23 +95,17 @@ double Field::get_new_data(int i, int j) {
     return data_new[i + nxg * j];
 }
 
-double Field::delta_data() {
-    // loop all cells including ghosts
-    // flattened array type loop
-    double out = 0.0;
-    #pragma omp parallel for reduction(+:out)
-    for (int k = 0; k < n_flat; k++) {
-        out += pow(data[k] - data_new[k],2);
-    }
-    return out/n_flat;
-}
-
+// promote data_new to be the live solution
+// this swaps the two vectors' internal pointers rather than copying n_flat
+// doubles, so it costs nothing and is not a serial section under OpenMP
+//
+// NOTE the consequence: afterwards data_new holds the PREVIOUS step, not a
+// duplicate of the new one. That is safe because Grid::relax rewrites every
+// live cell of data_new before reading it, fill_all_ghosts rewrites every
+// ghost cell of both arrays, and nothing outside relax reads data_new.
+// Break any of those three and this swap stops being equivalent to a copy.
 void Field::save_new_data() {
-    // loop all cells including ghosts
-    // flattened array type loop
-    for (int k = 0; k < n_flat; k++) {
-        data[k] = data_new[k];
-    }
+    data.swap(data_new);
 }
 
 // copy ghosts from old data to new data 

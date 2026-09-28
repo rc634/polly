@@ -45,10 +45,11 @@ void Grid::init(int i) {
     // matter source stuff
     // analytic: 
     // gets over-ridden if we read from file 
-    m_source.init_analytic(nxg, nyg, ng, dx, dy, p.xL, p.yL);
+    m_source.init_bump(nxg, nyg, ng, dx, dy, p.xL, p.yL);
     
-    // verbose 
-    std::cout << " - grid " << grid_n << " - dx = " << dx << "\n";
+    // verbose
+    std::cout << " - grid " << grid_n << " - dx = " << dx
+              << " - M_ADM = " << m_source.m_M_ADM << "\n";
 }
 
 void Grid::ID_gaussian(double x0, double y0, double sig) {
@@ -89,21 +90,18 @@ void Grid::ID_pdisc(double R, double density) {
     }
 }
 
-void Grid::ID_zeros() {
-
-    //////////////////////////////////////////
-    // // excludes ghosts 
-    // for (int j = jmin; j < jmax; j++) {
-    //     for (int i = imin; i < imax; i++) {
-
-    //////////////////////////////////////////
-    // includes ghosts 
+// sets psi = 1 + M / 2r for r > 1
+// sets psi = 1 + M / 2 for r < 1
+void Grid::ID_CappedSchwarzschild() {
+    double M = m_source.m_M_ADM;
     for (int j = 0; j < nyg; j++) {
         for (int i = 0; i < nxg; i++) {
-
-        // zero initial data 
-            W.set_data(0.,i,j);
-            psi.set_data(1.,i,j);
+            double x = W.get_x(i,j);
+            double y = W.get_y(i,j);
+            double r = std::sqrt(x*x + y*y);
+            double psi0 = (r < 1.) ? 1. + 0.5*M : 1. + 0.5*M/r;
+            W.set_data(0., i, j);
+            psi.set_data(psi0, i, j);
         }
     }
 }
@@ -124,11 +122,12 @@ double Grid::field_integral() {
 
 double Grid::max_psi() {
     double psi_max = 0.;
-    double psi_ij = 0.;
+    // psi_ij must be declared inside the loop body - a shared scratch
+    // variable would be raced over by the threads
     #pragma omp parallel for reduction(max:psi_max)
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
-            psi_ij = std::abs(psi.get_data(i,j));
+            double psi_ij = std::abs(psi.get_data(i,j));
             if (psi_ij > psi_max) psi_max = psi_ij;
         }
     }
@@ -148,14 +147,11 @@ double Grid::int_W() {
     return integral;
 }
 
-double Grid::int_psi() {
-    // can add metrics if wanted 
+double Grid::int_psim1() {
     double integral = 0.;
-    double root_g = 1.;
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
-            // root_g should = x
-            integral += psi.get_data(i,j) * root_g * dx * dy;
+            integral += (psi.get_data(i,j) - 1.) * dx * dy;
         }
     }
     return integral;
@@ -163,21 +159,27 @@ double Grid::int_psi() {
 
 
 void Grid::relax() {
-    // One Relaxation step 
-    
+    // One Relaxation step
+
+    // residual accumulators. volume weighted by x dx dy so that these are
+    // integrals over the axisymmetric domain rather than cell counts, which
+    // is what makes the resulting norm independent of resolution. the 2 pi
+    // is dropped since it cancels in the ratio
+    double res_acc = 0., src_acc = 0., vol_acc = 0.;
+
     // loop over all live cells
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) reduction(+:res_acc,src_acc,vol_acc)
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
             // time evolution step
 
             // const 
-            double pi = M_PI;
+            // double pi = M_PI;
 
             // coordinates 
             double x = W.get_x(i,j);
-            double y = W.get_y(i,j);
-            double r = sqrt(x*x + y*y);
+            // double y = W.get_y(i,j);
+            // double r = sqrt(x*x + y*y);
 
             // field values 
             double Wij  = W.get_data(i,j);
@@ -185,14 +187,22 @@ void Grid::relax() {
             double dWdx = W.d1x(i,j);
             double dWdy = W.d1y(i,j);
 
-            // get sources, effective or raw 
+            // get sources raw 
             double src_W   = m_source.get_src_W(i,j,x,psij);
             double src_psi = m_source.get_src_psi(i,j,x,psij);
 
+            // psi^-7 built from the 4, 2 and 1 powers of 1/psi
+            // a pow() call here is a libm call per cell per relaxation,
+            // which measured at ~40% of total runtime
+            double psiinv  = 1./psij;
+            double psiinv2 = psiinv*psiinv;
+            double psiinv4 = psiinv2*psiinv2;
+            double psiinv7 = psiinv4*psiinv2*psiinv;
+
             // non-flat-laplacian terms from PDE's
             double geom_W   = Wij/x/x;
-            double geom_psi = - 0.5 * pow(psij,-7) * (
-                dWdy*dWdy + dWdx*dWdx 
+            double geom_psi = - 0.5 * psiinv7 * (
+                dWdy*dWdy + dWdx*dWdx
                 - 2.*dWdx*Wij/x + Wij*Wij/x/x
             );
 
@@ -201,6 +211,15 @@ void Grid::relax() {
             double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - geom_psi - src_psi;
             // double dW_dt   = W.cylindrical_laplacian_HC(i,j,x) - geom_W - src_W;
             // double dpsi_dt = psi.cylindrical_laplacian_HC(i,j,x) - geom_psi - src_psi;
+
+            // dW_dt and dpsi_dt ARE the residuals of the two elliptic
+            // equations - the timestep below is what scales them down into
+            // the per-step change. accumulate them here, where they are
+            // already to hand, rather than sweeping the arrays again
+            double w = x * dx * dy;
+            res_acc += (dW_dt*dW_dt + dpsi_dt*dpsi_dt) * w;
+            src_acc += (src_W*src_W + src_psi*src_psi) * w;
+            vol_acc += w;
 
             // timestep f_new = f_old + dt * df/dt
             double new_W   = W.get_data(i,j) + dW_dt * m_dt * m_UR;
@@ -212,6 +231,11 @@ void Grid::relax() {
         }
     }
 
+    // volume weighted RMS of the residual, and of the source in the same
+    // norm. rel_res() forms the ratio, which is what convergence tests on
+    m_res      = std::sqrt(res_acc / vol_acc);
+    m_src_norm = std::sqrt(src_acc / vol_acc);
+
     // debugging
     // W.copy_old_ghosts_to_new();
 
@@ -219,9 +243,6 @@ void Grid::relax() {
     // immediately after creating new data must fill its ghosts!
     // before diffing!
     fill_all_ghosts();
-
-    // change in new solution, L2 norm
-    m_delta = W.delta_data() + psi.delta_data();
 
     // Save over the old data - 
     // - with the finished new data
@@ -231,8 +252,15 @@ void Grid::relax() {
     fill_all_ghosts();
 }
 
-// newer mixed type boundary conditions based on asymptotic expansion
+// choose the boundary type here 
+// this is a wrapper function which is alwayas called from outside 
 void Grid::fill_all_ghosts() {
+    // fill_all_ghosts_ADM();
+    fill_all_ghosts_robin();
+}
+
+// mixed type boundary conditions based on asymptotic expansion
+void Grid::fill_all_ghosts_robin() {
     // two ghosts thickness hard coded!
 
     // warning only one thickness of ghost computed for outer!
@@ -319,10 +347,10 @@ void Grid::fill_all_ghosts() {
         x3 = W.get_x(i,j3);
         y3 = W.get_y(i,j3);
 
-        psi1 = psi.get_data(i,j1); 
+        psi1 = psi.get_data(i,j1);
         psi2 = psi.get_data(i,j2);
-        psi3 = psi1 - 2. * dx * x2 * (psi2-1.) / (x2*x2 + y2*y2);
-        psi4 = psi2 - 2. * dx * x3 * (psi3-1.) / (x3*x3 + y3*y3);
+        psi3 = psi1 - 2. * dy * y2 * (psi2-1.) / (x2*x2 + y2*y2);
+        psi4 = psi2 - 2. * dy * y3 * (psi3-1.) / (x3*x3 + y3*y3);
 
         W1 = W.get_data(i,j1); 
         W2 = W.get_data(i,j2);
@@ -343,6 +371,88 @@ void Grid::fill_all_ghosts() {
 
 }
 
+// Dirichlet outer BC for psi using precomputed ADM mass.
+// Inner boundaries and W outer boundaries identical to fill_all_ghosts().
+void Grid::fill_all_ghosts_ADM() {
+
+    // loop left boundary -- symmetric psi, antisymmetric W
+    for (int j = 0; j < nyg; j++) {
+        W.set_data(-W.get_data(3,j),0,j);
+        W.set_data(-W.get_data(2,j),1,j);
+        W.set_new_data(-W.get_new_data(3,j),0,j);
+        W.set_new_data(-W.get_new_data(2,j),1,j);
+        psi.set_data(psi.get_data(3,j),0,j);
+        psi.set_data(psi.get_data(2,j),1,j);
+        psi.set_new_data(psi.get_new_data(3,j),0,j);
+        psi.set_new_data(psi.get_new_data(2,j),1,j);
+    }
+
+    // loop bottom boundary -- symmetric psi and W
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(W.get_data(i,2), i, 1);
+        W.set_data(W.get_data(i,3), i, 0);
+        W.set_new_data(W.get_new_data(i,2), i, 1);
+        W.set_new_data(W.get_new_data(i,3), i, 0);
+        psi.set_data(psi.get_data(i,2), i, 1);
+        psi.set_data(psi.get_data(i,3), i, 0);
+        psi.set_new_data(psi.get_new_data(i,2), i, 1);
+        psi.set_new_data(psi.get_new_data(i,3), i, 0);
+    }
+
+    double x3, y3, x4, y4, r3, r4, psi3, psi4;
+    double W1, W2, W3, W4, x2, y2;
+    double M = m_source.m_M_ADM;
+    int i4 = nxg-1, i3 = nxg-2, i2 = nxg-3, i1 = nxg-4;
+    int j4 = nyg-1, j3 = nyg-2, j2 = nyg-3, j1 = nyg-4;
+
+    // loop right boundary -- W same Robin, psi Dirichlet from M_ADM
+    for (int j = 0; j < nyg; j++) {
+        x2 = W.get_x(i2,j);
+        y2 = W.get_y(i2,j);
+        x3 = W.get_x(i3,j);  y3 = W.get_y(i3,j);
+        x4 = W.get_x(i4,j);  y4 = W.get_y(i4,j);
+
+        r3 = std::sqrt(x3*x3 + y3*y3);
+        r4 = std::sqrt(x4*x4 + y4*y4);
+        psi3 = 1. + 0.5 * M / r3;
+        psi4 = 1. + 0.5 * M / r4;
+
+        W1 = W.get_data(i1,j);
+        W2 = W.get_data(i2,j);
+        W3 = W1 + 2. * dx * (y2*y2 - 2.*x2*x2) * W2 / (y2*y2*x2 + x2*x2*x2);
+        W4 = W2 + 2. * dx * (y3*y3 - 2.*x3*x3) * W3 / (y3*y3*x3 + x3*x3*x3);
+
+        W.set_data(W3, i3, j);    W.set_new_data(W3, i3, j);
+        W.set_data(W4, i4, j);    W.set_new_data(W4, i4, j);
+        psi.set_data(psi3, i3, j); psi.set_new_data(psi3, i3, j);
+        psi.set_data(psi4, i4, j); psi.set_new_data(psi4, i4, j);
+    }
+
+    // loop top boundary -- W same Robin, psi Dirichlet from M_ADM
+    for (int i = 0; i < nxg; i++) {
+        x2 = W.get_x(i,j2);
+        y2 = W.get_y(i,j2);
+        x3 = W.get_x(i,j3);  y3 = W.get_y(i,j3);
+        x4 = W.get_x(i,j4);  y4 = W.get_y(i,j4);
+
+        r3 = std::sqrt(x3*x3 + y3*y3);
+        r4 = std::sqrt(x4*x4 + y4*y4);
+        psi3 = 1. + 0.5 * M / r3;
+        psi4 = 1. + 0.5 * M / r4;
+
+        W1 = W.get_data(i,j1);
+        W2 = W.get_data(i,j2);
+        W3 = W1 - 6. * dy * y2 * W2 / (y2*y2 + x2*x2);
+        W4 = W2 - 6. * dy * y3 * W3 / (y3*y3 + x3*x3);
+
+        W.set_data(W3, i, j3);    W.set_new_data(W3, i, j3);
+        W.set_data(W4, i, j4);    W.set_new_data(W4, i, j4);
+        psi.set_data(psi3, i, j3); psi.set_new_data(psi3, i, j3);
+        psi.set_data(psi4, i, j4); psi.set_new_data(psi4, i, j4);
+    }
+}
+
+// trivial ghost conditions, 0 or 1 symptotic behaviour
 void Grid::fill_all_ghosts_dirichlet() {
 
 

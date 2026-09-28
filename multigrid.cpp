@@ -55,7 +55,7 @@ void Multigrid::initial_data() {
     std::cout << "Zeroing initial data !\n";
     for (int i = 0; i < p.num_grids; i++)
     {
-        grids[i].ID_zeros();
+        grids[i].ID_CappedSchwarzschild();
     }
     // std::cout << "Integral of solution : " << fine_grid_ptr->field_integral() << "\n";
 
@@ -169,10 +169,8 @@ void Multigrid::up_cycle(const double epsilon) {
     flush();
     double diff  = 100.;
     int    count = 0;
-    double psi4_max_global = 1.;
-    double vmax_global = 0.;
-    double rhomax_global = 0.;
-    double cfl_mod = 1.;
+
+    // fixed CFL throughout - m_UR stays at the 1. set in Grid::init
 
     for (size_t i = i_coarse; i <= i_fine; i++)
     {
@@ -190,27 +188,17 @@ void Multigrid::up_cycle(const double epsilon) {
         while (true) {
 
             // multiple consecutive relaxations
-            for (int q = 0; q < p.iter; q++) 
+            for (int q = 0; q < p.iter; q++)
             {
-                psi4_max_global = std::pow(grids[i].max_psi(),4);
-                rhomax_global = grids[i].m_source.max_rho();
-                vmax_global = grids[i].m_source.max_v();
-                cfl_mod = rhomax_global * 2. * M_PI 
-                        * 5. * psi4_max_global;
-                cfl_mod = std::max(1.,cfl_mod);
-                cfl_mod = 1.;
-                grids[i].m_UR = 1./cfl_mod;
                 grids[i].relax();
             }
 
-            // double stiffness = 10. * M_PI * std::pow(grids[i].max_psi(), 4) * rhomax_global;
-            // double dt_used   = grids[i].m_dt * grids[i].m_UR;
-            // std::cout << "  stiffness*dt = " << stiffness * dt_used << "\n";
-
-            diff = std::abs(grids[i].m_delta);
+            // convergence is on the relative residual, which carries no
+            // factor of dt and so means the same thing on every grid
+            diff = grids[i].rel_res();
             if (diff < epsilon) {
-                std::cout << "  converged after " << count * p.iter 
-                          << " iterations  [diff = " << diff << "]\n";
+                std::cout << "  converged after " << count * p.iter
+                          << " iterations  [rel res = " << diff << "]\n";
                 break;
             }
 
@@ -222,17 +210,18 @@ void Multigrid::up_cycle(const double epsilon) {
             int filled = static_cast<int>(frac * bar_width);
             std::string bar = std::string(filled, '#') + std::string(bar_width - filled, '.');
 
-            // printing to terminal
+            // printing to terminal — less often for coarser grids
+            int print_stride = 1 << (i_fine - i);  // 1 for fine, 2, 4, 8... for coarser
+            if (count % print_stride != 0) { count += 1; continue; }
             double iW  = grids[i].int_W();
-            double iP  = grids[i].int_psi();
-            std::cout << "  " << count * p.iter
+            double iP  = grids[i].int_psim1();
+            std::cout << " -   " << count * p.iter
                     << " it  [" << bar << "]"
-                    << "  diff "    << std::scientific << std::setw(11) << diff
-                    << std::fixed   << std::setprecision(3)
-                    << "  cfl "     << p.CFL / cfl_mod
-                    << "  cfl_mod " << std::setprecision(5) << cfl_mod
+                    << std::scientific << std::setprecision(3)
+                    << "  res "     << diff
+                    << std::fixed   << std::setprecision(8)
                     << "  intW "    << iW
-                    << "  intp "    << iP
+                    << "  intpm1 "  << iP
                     << "\n";
 
             count += 1;

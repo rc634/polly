@@ -82,10 +82,6 @@ public:
 
     double bilinear_interp_xy(double x, double y) const;
 
-    // L2 norm new - old data
-
-    double delta_data();
-
     // differential operators
 
     double d1x(int i, int j);

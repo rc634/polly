@@ -12,41 +12,105 @@
 // Init: analytic — evaluate onto grid and store
 // -----------------------------------------------------------------------
 
-void Source::init_analytic(int nxg, int nyg, int ng,
-                           double dx, double dy,
-                           double xL, double yL) {
+void Source::init_bump(int nxg, int nyg, int ng,
+                       double dx, double dy,
+                       double xL, double yL) {
     m_nxg = nxg;
     m_nyg = nyg;
+    m_ng  = ng;
+    m_dx  = dx;
+    m_dy  = dy;
+    m_xL  = xL;
     m_v.assign(nxg * nyg, 0.);
     m_rho.assign(nxg * nyg, 0.);
 
     for (int j = 0; j < nyg; j++) {
         for (int i = 0; i < nxg; i++) {
-            // cell-centre coordinates (ghost-inclusive, same convention as Field)
             double x = xL + (i - ng + 0.5) * dx;
             double y = yL + (j - ng + 0.5) * dy;
 
-            // fractional coords wrt ellipsoid
             double xf = x / m_width;
             double yf = y / m_height;
-            double rf     = std::sqrt(xf*xf + yf*yf);
-            // packet encoding overall compact support
+            double rf = std::sqrt(xf*xf + yf*yf);
             double packet = 0.;
             double GERRY = sqrt(3.);
 
-            if (xf*xf + yf*yf < 1.) {
-                // double env    = 1. + std::cos(rf * M_PI);
-                // packet = env * env / 4.; //normalise to packet(0)=1
+            if (xf*xf + yf*yf < 1.)
                 packet = exp(GERRY*GERRY*rf*rf/(rf*rf-1.));
+
+            switch (m_rotation_type) { // SPHEROIDAL RADIUS 
+                case ROT_FAST_CRUST: m_v[flat(i,j)] = m_v_0 * rf;        break;
+                case ROT_FAST_CORE:  m_v[flat(i,j)] = m_v_0 * (1. / rf); break;
+                default:             m_v[flat(i,j)] = m_v_0;              break;
             }
 
-            m_v[flat(i,j)]   = m_v_0;
             m_rho[flat(i,j)] = m_rho_0 * packet;
         }
     }
 
-    std::cout << " - Source: analytic  rho_0 =" << m_rho_0
-              << "  omega_0 =" << m_v_0 << "\n";
+    integrate_M_ADM();
+    std::cout << " - Source: bump  rho_0=" << m_rho_0
+              << "  omega_0=" << m_v_0 << "  M_ADM=" << m_M_ADM << "\n";
+}
+
+
+void Source::init_SJ(int nxg, int nyg, int ng,
+                     double dx, double dy,
+                     double xL, double yL) {
+    m_nxg = nxg;
+    m_nyg = nyg;
+    m_ng  = ng;
+    m_dx  = dx;
+    m_dy  = dy;
+    m_xL  = xL;
+    m_v.assign(nxg * nyg, 0.);
+    m_rho.assign(nxg * nyg, 0.);
+
+    for (int j = 0; j < nyg; j++) {
+        for (int i = 0; i < nxg; i++) {
+            double x = xL + (i - ng + 0.5) * dx;
+            double y = yL + (j - ng + 0.5) * dy;
+
+            double xf = x / m_width;
+            double yf = y / m_height;
+            double rf2 = xf*xf + yf*yf;
+            double packet = 0.;
+
+            if (rf2 < 1.) {
+                double t = 1. - rf2;
+                packet = t*t*t*t;  // (1 - rf^2)^4
+            }
+
+            switch (m_rotation_type) { // CYLINDER RADIUS 
+                case ROT_FAST_CRUST: m_v[flat(i,j)] = m_v_0 * xf; break;
+                case ROT_FAST_CORE:  m_v[flat(i,j)] = m_v_0 / xf; break;
+                default:             m_v[flat(i,j)] = m_v_0;      break;
+            }
+
+            m_rho[flat(i,j)] = m_rho_0 * packet;
+        }
+    }
+
+    integrate_M_ADM();
+    std::cout << " - Source: SJ  rho_0=" << m_rho_0
+              << "  omega_0=" << m_v_0 << "  M_ADM=" << m_M_ADM << "\n";
+}
+
+
+// -----------------------------------------------------------------------
+// M_ADM: exact for conformally-flat Hamiltonian constraint
+//   ∇²ψ = -2π ρ_eff   =>   M = 2π ∫∫ ρ_eff x dx dy   (Gauss, axisymmetry)
+// -----------------------------------------------------------------------
+void Source::integrate_M_ADM() {
+    double M_half = 0.;
+    for (int j = m_ng; j < m_nyg - m_ng; j++) {
+        for (int i = m_ng; i < m_nxg - m_ng; i++) {
+            double x = m_xL + (i - m_ng + 0.5) * m_dx;
+            M_half += 2. * M_PI * get_rho_eff(i, j, x, 1.) * x * m_dx * m_dy;
+        }
+    }
+    // doubled as integrator uses summetry plane cutting solution in half 
+    m_M_ADM = 2 * M_half;
 }
 
 
