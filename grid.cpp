@@ -48,7 +48,8 @@ void Grid::init(int i) {
     m_source.init_bump(nxg, nyg, ng, dx, dy, p.xL, p.yL);
     
     // verbose
-    std::cout << " - grid " << grid_n << " - dx = " << dx
+    std::cout << " - grid " << grid_n << " - N = " << nx << " x " << ny
+              << " - dx = " << dx
               << " - M_ADM = " << m_source.m_M_ADM << "\n";
 }
 
@@ -158,6 +159,64 @@ double Grid::int_psim1() {
 }
 
 
+// the PDE operator F(u) = laplacian - geom - src at one live cell, WITHOUT
+// tau. the single copy of the physics, shared by relax, compute_residual and
+// the FAS restriction. also hands back the sources, for the residual norm.
+// needs the ghosts of data filled
+void Grid::pde_operator(int i, int j, double& F_W, double& F_psi,
+                        double& src_W, double& src_psi) {
+    // coordinates
+    double x = W.get_x(i,j);
+
+    // field values
+    double Wij  = W.get_data(i,j);
+    double psij = psi.get_data(i,j);
+    double dWdx = W.d1x(i,j);
+    double dWdy = W.d1y(i,j);
+
+    // get sources raw
+    src_W   = m_source.get_src_W(i,j,x,psij);
+    src_psi = m_source.get_src_psi(i,j,x,psij);
+
+    // psi^-7 built from the 4, 2 and 1 powers of 1/psi
+    // a pow() call here is a libm call per cell per relaxation,
+    // which measured at ~40% of total runtime
+    double psiinv  = 1./psij;
+    double psiinv2 = psiinv*psiinv;
+    double psiinv4 = psiinv2*psiinv2;
+    double psiinv7 = psiinv4*psiinv2*psiinv;
+
+    // non-flat-laplacian terms from PDE's
+    double geom_W   = Wij/x/x;
+    double geom_psi = - 0.5 * psiinv7 * (
+        dWdy*dWdy + dWdx*dWdx
+        - 2.*dWdx*Wij/x + Wij*Wij/x/x
+    );
+
+    // poisson eqaution
+    F_W   = W.cylindrical_laplacian(i,j,x) - geom_W - src_W;
+    F_psi = psi.cylindrical_laplacian(i,j,x) - geom_psi - src_psi;
+    // F_W   = W.cylindrical_laplacian_HC(i,j,x) - geom_W - src_W;
+    // F_psi = psi.cylindrical_laplacian_HC(i,j,x) - geom_psi - src_psi;
+}
+
+// xi = F(u) - tau on every live cell, at the current data
+// the fine grid half of building a coarse tau
+void Grid::compute_residual() {
+    // the stencils read ghosts, so make sure they match the data
+    fill_all_ghosts();
+
+    #pragma omp parallel for schedule(static)
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            double F_W, F_psi, src_W, src_psi;
+            pde_operator(i, j, F_W, F_psi, src_W, src_psi);
+            W.set_xi(F_W - W.get_tau(i,j), i, j);
+            psi.set_xi(F_psi - psi.get_tau(i,j), i, j);
+        }
+    }
+}
+
 void Grid::relax() {
     // One Relaxation step
 
@@ -172,48 +231,18 @@ void Grid::relax() {
     for (int j = jmin; j < jmax; j++) {
         for (int i = imin; i < imax; i++) {
             // time evolution step
-
-            // const 
-            // double pi = M_PI;
-
-            // coordinates 
             double x = W.get_x(i,j);
-            // double y = W.get_y(i,j);
-            // double r = sqrt(x*x + y*y);
 
-            // field values 
-            double Wij  = W.get_data(i,j);
-            double psij = psi.get_data(i,j);
-            double dWdx = W.d1x(i,j);
-            double dWdy = W.d1y(i,j);
+            double F_W, F_psi, src_W, src_psi;
+            pde_operator(i, j, F_W, F_psi, src_W, src_psi);
 
-            // get sources raw 
-            double src_W   = m_source.get_src_W(i,j,x,psij);
-            double src_psi = m_source.get_src_psi(i,j,x,psij);
-
-            // psi^-7 built from the 4, 2 and 1 powers of 1/psi
-            // a pow() call here is a libm call per cell per relaxation,
-            // which measured at ~40% of total runtime
-            double psiinv  = 1./psij;
-            double psiinv2 = psiinv*psiinv;
-            double psiinv4 = psiinv2*psiinv2;
-            double psiinv7 = psiinv4*psiinv2*psiinv;
-
-            // non-flat-laplacian terms from PDE's
-            double geom_W   = Wij/x/x;
-            double geom_psi = - 0.5 * psiinv7 * (
-                dWdy*dWdy + dWdx*dWdx
-                - 2.*dWdx*Wij/x + Wij*Wij/x/x
-            );
-
-            // poisson eqaution
-            double dW_dt   = W.cylindrical_laplacian(i,j,x) - geom_W - src_W;
-            double dpsi_dt = psi.cylindrical_laplacian(i,j,x) - geom_psi - src_psi;
-            // double dW_dt   = W.cylindrical_laplacian_HC(i,j,x) - geom_W - src_W;
-            // double dpsi_dt = psi.cylindrical_laplacian_HC(i,j,x) - geom_psi - src_psi;
+            // relaxing F(u) - tau -> 0
+            // FAS source offset tau is zero on the finest grid
+            double dW_dt   = F_W - W.get_tau(i,j);
+            double dpsi_dt = F_psi - psi.get_tau(i,j);
 
             // dW_dt and dpsi_dt ARE the residuals of the two elliptic
-            // equations - the timestep below is what scales them down into
+            // equations (tau included) - the timestep below is what scales them down into
             // the per-step change. accumulate them here, where they are
             // already to hand, rather than sweeping the arrays again
             double w = x * dx * dy;

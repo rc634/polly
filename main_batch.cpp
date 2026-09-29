@@ -74,7 +74,8 @@ static void run(const RunConfig& cfg) {
 
     mg.init();
     mg.initial_data();
-    mg.up_cycle(mg.p.res_tol);
+    // mg.up_cycle(mg.p.res_tol);
+    mg.v_solve(mg.p.res_tol);
     mg.fine_grid_ptr->save_state();
     save_run_params(cfg, *mg.fine_grid_ptr);
 }

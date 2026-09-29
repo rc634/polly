@@ -84,6 +84,13 @@ public:
     double int_W();
     double int_psim1();
 
+    // PDE operator F(u) at one live cell, without tau
+    void pde_operator(int i, int j, double& F_W, double& F_psi,
+                      double& src_W, double& src_psi);
+
+    // fills xi = F(u) - tau on the live cells
+    void compute_residual();
+
     // parabolic diffusion type relaxation
     void relax();
 

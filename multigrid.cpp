@@ -1,6 +1,7 @@
 #include "multigrid.hpp"
 #include <cmath>
 #include <iomanip>
+#include <algorithm> // for std::fill
 
 Multigrid::Multigrid() {
     // resize vector
@@ -166,6 +167,8 @@ void Multigrid::up_cycle(const double epsilon) {
     std::cout << "  UP CYCLE\n";
     hline('=', 52);
 
+    // plain relaxation on every level, so any tau left by a v cycle must go
+    clear_tau();
     flush();
     double diff  = 100.;
     int    count = 0;
@@ -241,49 +244,107 @@ void Multigrid::up_cycle(const double epsilon) {
 
 
 
+/////////////////////////////
+// V SOLVE
+
+void Multigrid::v_solve(const double epsilon) {
+    std::cout << std::setprecision(8);
+
+    auto hline = [](char c, int n) { std::cout << std::string(n, c) << "\n"; };
+
+    hline('=', 52);
+    std::cout << "  V SOLVE\n";
+    hline('=', 52);
+
+    // the finest tau must be zero, v_cycle sets all the others
+    clear_tau();
+    fine_grid_ptr->fill_all_ghosts();
+    double diff  = 100.;
+    int    count = 0;
+
+    std::cout << "  grids " << i_coarse << " - " << i_fine
+              << "   nu1 = " << p.nu1 << "   nu2 = " << p.nu2 << "\n";
+    hline('-', 52);
+
+    while (true) {
+
+        v_cycle(i_fine, i_coarse);
+
+        // rel res of the fine grid's last post-smoothing relaxation
+        diff = fine_grid_ptr->rel_res();
+        if (diff < epsilon) {
+            std::cout << "  converged after " << count + 1
+                      << " v cycles  [rel res = " << diff << "]\n";
+            break;
+        }
+
+        // progress line
+        // bar width scales with log convergence
+        int bar_width = 20;
+        double frac = std::log10(diff / epsilon);          // >0 means not converged
+        frac = std::max(0., std::min(1., 1. - frac / 6.)); // normalise over ~6 decades
+        int filled = static_cast<int>(frac * bar_width);
+        std::string bar = std::string(filled, '#') + std::string(bar_width - filled, '.');
+
+        double iW  = fine_grid_ptr->int_W();
+        double iP  = fine_grid_ptr->int_psim1();
+        std::cout << " -   " << count
+                << " cyc [" << bar << "]"
+                << std::scientific << std::setprecision(3)
+                << "  res "     << diff
+                << std::fixed   << std::setprecision(8)
+                << "  intW "    << iW
+                << "  intpm1 "  << iP
+                << "\n";
+
+        count += 1;
+    }
+
+    hline('=', 52);
+    std::cout << "  V SOLVE COMPLETE\n";
+    hline('=', 52);
+    std::cout << "\n";
+}
+
+
+
 
 
 /////////////////////////////
-// V CYCLE 
+// V CYCLE
 
+// one FAS v cycle from i_top down to i_bot and back
+// i_top's own tau is left alone (zero if i_top is the finest grid)
 void Multigrid::v_cycle(int i_top, int i_bot) {
-    // Restriction 
     if (i_top > i_fine || i_bot < i_coarse) {
         std::cout << "Warning! incorrect i_top or i_bot given to Multigrid::v_cycle!\n";
         return;
     }
 
-    // loop down over grids to set initial data on all levels
+    // down : smooth, then hand the coarser level its tau
     for (int i = i_top; i > i_bot; i--)
     {
-        // std::cout << "Relax grid " << i << "\n"; 
-        for (int q = 0; q<p.iter; q++)
+        for (int q = 0; q < p.nu2; q++)
         {
             grids[i].relax();
         }
-        // std::cout << "Restrict " << i << " to " << i-1 <<"\n";
-        restrict_down(grids[i],grids[i-1]);
+        restrict_fas(grids[i], grids[i-1]);
     }
 
-    // Prolongation 
+    // bottom : tau fixed for the whole solve
+    for (int q = 0; q < p.nu1; q++)
+    {
+        grids[i_bot].relax();
+    }
 
-    // loop up over grids to set initial data on all levels
+    // up : correct, then smooth
     for (int i = i_bot; i < i_top; i++)
     {
-        // std::cout << "Relax grid " << i << "\n"; 
-        for (int q = 0; q<p.iter; q++)
+        prolongate_fas(grids[i], grids[i+1]);
+        for (int q = 0; q < p.nu2; q++)
         {
-            grids[i].relax();
+            grids[i+1].relax();
         }
-        // std::cout << "Prolong " << i << " to " << i+1 <<"\n";
-        prolongate_up(grids[i],grids[i+1]);
-    }
-
-    // std::cout << "Fine level relax\n"; 
-    // final smoothing
-    for (int q = 0; q<p.iter; q++)
-    {
-        fine_grid_ptr->relax();
     }
 }
 
@@ -354,6 +415,85 @@ void Multigrid::restrict_down(const Grid &fine, Grid &coarse) {
     }
 }
 
+
+void Multigrid::restrict_fas(Grid &fine, Grid &coarse) {
+    // xi_f at the fine data as it stands
+    fine.compute_residual();
+
+    // coarse data = R u_f, with ghosts so F_c can be evaluated on it
+    restrict_down(fine, coarse);
+    coarse.fill_all_ghosts();
+
+    // tau_c = F_c(R u_f) - R xi_f
+    // if the fine grid is converged xi_f = 0, so R u_f already solves the
+    // coarse problem and the correction sent back up is zero
+    #pragma omp parallel for schedule(static)
+    for (int j = coarse.jmin; j < coarse.jmax; j++) {
+        for (int i = coarse.imin; i < coarse.imax; i++) {
+            // fine indices
+            int i1 = i*2 - p.ng, i2 = i*2 - p.ng + 1;
+            int j1 = j*2 - p.ng, j2 = j*2 - p.ng + 1;
+
+            double Rxi_W = 0.25 * (fine.W.get_xi(i1,j1) + fine.W.get_xi(i2,j1) +
+                                   fine.W.get_xi(i1,j2) + fine.W.get_xi(i2,j2));
+            double Rxi_psi = 0.25 * (fine.psi.get_xi(i1,j1) + fine.psi.get_xi(i2,j1) +
+                                     fine.psi.get_xi(i1,j2) + fine.psi.get_xi(i2,j2));
+
+            double F_W, F_psi, src_W, src_psi;
+            coarse.pde_operator(i, j, F_W, F_psi, src_W, src_psi);
+
+            coarse.W.set_tau(F_W - Rxi_W, i, j);
+            coarse.psi.set_tau(F_psi - Rxi_psi, i, j);
+        }
+    }
+}
+
+void Multigrid::prolongate_fas(Grid &coarse, Grid &fine) {
+    // the correction is P u_c - P R u_f, which is P(u_c - R u_f) as P is
+    // linear. interpolating the two separately means each gets its ghosts
+    // from fill_all_ghosts, so the correction's ghosts are consistent with
+    // the affine outer BCs without a separate homogeneous BC routine
+
+    // P u_c, parked in the fine scratch array. relax rewrites all of
+    // data_new's live cells before reading them, so this is safe
+    coarse.fill_all_ghosts();
+    #pragma omp parallel for schedule(static)
+    for (int j = fine.jmin; j < fine.jmax; j++) {
+        for (int i = fine.imin; i < fine.imax; i++) {
+            double x = fine.W.get_x(i,j);
+            double y = fine.W.get_y(i,j);
+            fine.W.set_new_data(coarse.W.bilinear_interp_xy(x,y), i, j);
+            fine.psi.set_new_data(coarse.psi.bilinear_interp_xy(x,y), i, j);
+        }
+    }
+
+    // u_c is no longer needed, so overwrite it with R u_f. the fine grid is
+    // untouched since restrict_fas, so this is the same R u_f tau was built on
+    restrict_down(fine, coarse);
+    coarse.fill_all_ghosts();
+
+    // u_f += P u_c - P R u_f
+    #pragma omp parallel for schedule(static)
+    for (int j = fine.jmin; j < fine.jmax; j++) {
+        for (int i = fine.imin; i < fine.imax; i++) {
+            double x = fine.W.get_x(i,j);
+            double y = fine.W.get_y(i,j);
+            double dW   = fine.W.get_new_data(i,j) - coarse.W.bilinear_interp_xy(x,y);
+            double dpsi = fine.psi.get_new_data(i,j) - coarse.psi.bilinear_interp_xy(x,y);
+            fine.W.set_data(fine.W.get_data(i,j) + dW, i, j);
+            fine.psi.set_data(fine.psi.get_data(i,j) + dpsi, i, j);
+        }
+    }
+
+    fine.fill_all_ghosts();
+}
+
+void Multigrid::clear_tau() {
+    for (int i = 0; i < p.num_grids; i++) {
+        std::fill(grids[i].W.tau.begin(),   grids[i].W.tau.end(),   0.);
+        std::fill(grids[i].psi.tau.begin(), grids[i].psi.tau.end(), 0.);
+    }
+}
 
 void Multigrid::prolongate_up(const Grid &coarse, Grid &fine) {
     double x = 0.;

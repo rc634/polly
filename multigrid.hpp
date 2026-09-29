@@ -47,6 +47,9 @@ public:
     // starts at low res then solves its way up with the threshold
     void up_cycle(const double epsilon);
 
+    // repeated v cycles on the full heirarchy until the fine grid meets the threshold
+    void v_solve(const double epsilon);
+
     // single relax step of fine grid
     void refine();
 
@@ -61,6 +64,17 @@ public:
     // promises not to modify coarse
     void prolongate_up(const Grid &coarse, Grid &fine);
 
+
+    // FAS restriction : fine -> coarse
+    // coarse data = R u_f, and coarse tau = F_c(R u_f) - R xi_f
+    void restrict_fas(Grid &fine, Grid &coarse);
+
+    // FAS prolongation : coarse -> fine
+    // u_f += P(u_c - R u_f). leaves R u_f in coarse data
+    void prolongate_fas(Grid &coarse, Grid &fine);
+
+    // zero tau on every level, so plain relaxation solves the original PDE
+    void clear_tau();
 
     // sources
     void restrict_source_down(const Grid& fine, Grid& coarse);

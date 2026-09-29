@@ -27,7 +27,8 @@ int main() {
     mg.save_data("g");
 
     // give it a tolerance
-    mg.up_cycle(p.res_tol);
+    // mg.up_cycle(p.res_tol);
+    mg.v_solve(p.res_tol);
 
     mg.save_data("f");
 

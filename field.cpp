@@ -30,11 +30,8 @@ void Field::init(int i) {
     // data arrays
     data.resize(n_flat,0.0);
     data_new.resize(n_flat,0.0);
-    // rhs.resize(n_flat,0.0);
-    // tau.resize(n_flat,0.0);
-
-    
-
+    xi.resize(n_flat,0.0);
+    tau.resize(n_flat,0.0);
 }
 
 // index getter
@@ -93,6 +90,22 @@ void Field::set_new_data(double val, int i, int j) {
 
 double Field::get_new_data(int i, int j) {
     return data_new[i + nxg * j];
+}
+
+void Field::set_xi(double val, int i, int j) {
+    xi[i + nxg * j] = val;
+}
+
+double Field::get_xi(int i, int j) const {
+    return xi[i + nxg * j];
+}
+
+void Field::set_tau(double val, int i, int j) {
+    tau[i + nxg * j] = val;
+}
+
+double Field::get_tau(int i, int j) const {
+    return tau[i + nxg * j];
 }
 
 // promote data_new to be the live solution

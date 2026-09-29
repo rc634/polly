@@ -42,15 +42,15 @@ public:
     // delete later 
     std::vector<double> data_new; 
 
-    // u_i <- u_i + dt * (rhs - laplacian_i)
-    // fixed for a whole v cycle 
-    // created and fixed on restriction
-    // std::vector<double> rhs; 
+    // residual of the PDE, F(u) - tau, evaluated at the current data
+    // restricted down to build the coarse grid tau
+    std::vector<double> xi;
 
-    // dual variable
-    // acts as residual on restriction 
-    // acts as delta on prolongation
-    // std::vector<double> tau; 
+    // FAS source offset, fixed for a whole v cycle
+    // zero on the finest grid, set on restriction to the coarse grid:
+    //   tau_c = F_c(R u_f) - R xi_f
+    // relaxation drives F(u) - tau -> 0
+    std::vector<double> tau;
 
     Field();
 
@@ -66,7 +66,15 @@ public:
 
     void copy_old_ghosts_to_new();
 
-    // getters 
+    void set_xi(double val, int i, int j);
+
+    void set_tau(double val, int i, int j);
+
+    // getters
+
+    double get_xi(int i, int j) const;
+
+    double get_tau(int i, int j) const;
 
     double get_new_data(int i, int j);
 
