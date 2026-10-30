@@ -1,0 +1,18 @@
+# build products
+polly
+polly_batch
+polly_omp
+polly_batch_omp
+*.o
+
+# run output and parameter sweeps (regenerate with polly / polly_batch)
+data/
+batch/
+
+# plotting: python venv, generated figures, scratch notes
+vis/plt-env/
+*.png
+*.pdf
+vis/scratch.txt
+
+.DS_Store

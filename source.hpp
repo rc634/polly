@@ -11,10 +11,17 @@ public:
     static constexpr bool EFFECTIVE_RHO = true;
     static constexpr bool EFFECTIVE_V = true;
 
+    // smooth bump profiles
     void init_bump(int nxg, int nyg, int ng,
                    double dx, double dy,
                    double xL, double yL);
 
+    // flat density profile nakamura like profiles 
+    void init_naka(int nxg, int nyg, int ng,
+                   double dx, double dy,
+                   double xL, double yL);
+
+    // symmetric jacobi profiles 
     void init_SJ(int nxg, int nyg, int ng,
                  double dx, double dy,
                  double xL, double yL);
@@ -55,32 +62,64 @@ public:
     // Save to dat
     void save(const std::string& out_dir, int ng, const Field& psi_field) const;
 
-    // rotation profile types for m_v
-    static constexpr int ROT_FLAT       = 0; // uniform Omega
-    static constexpr int ROT_FAST_CRUST = 1; // Omega ~ rf  (slow core, fast crust)
-    static constexpr int ROT_FAST_CORE  = 2; // Omega ~ 1 - rf (fast core, slow crust)
+    // post-solve check that the matter is still physical. the raw density
+    // carries a factor 1 - v_phys^2 with v_phys = v_raw x psi^2, which turns
+    // negative once rotation drives the matter superluminal. needs the solved
+    // psi, so it can only be run after the multigrid solve.
+    // returns true if everything stayed positive
+    bool sanity_check(int ng, const Field& psi_field) const;
 
-    void set_source_params(double rho_0, double v_0, double height, double width, int rotation_type = ROT_FLAT) {
-        m_rho_0         = rho_0;
-        m_v_0           = v_0;
-        m_height        = height;
-        m_width         = width;
-        m_rotation_type = rotation_type;
+    void set_source_params(double rho_0, double v_0, double height, double width) {
+        m_rho_0  = rho_0;
+        m_v_0    = v_0;
+        m_height = height;
+        m_width  = width;
     }
 
 private:
-    double m_rho_0  =  12.0;// 4.0; // 3.4;
-    double m_v_0    = 0.4;
-    double m_height = 4.; // 0.5;
-    double m_width  = 0.5; // sqrt(2.);
-    int m_rotation_type = ROT_FAST_CORE;
+
+// arrays 
     std::vector<double> m_v; // source rotation array
     std::vector<double> m_rho; // source density array
+
+    // matter density stuff 
+    double m_rho_0  =  12.0;// 4.0; // 3.4;
+    double m_v_0    = 0.4;
+    // bump steepness, exp(sigma^2 rf^2 / (rf^2 - 1)) in init_bump
+    double m_sigma   = std::sqrt(3.);
+
+    // matter shape 
+    double m_height = 4.; // 0.5;
+    double m_width  = 0.5; // sqrt(2.);
+
+    // rotation stuff
+    // v = (v_0/x_f) (1 + a_v * bump(sigma_v)). a_v = 0 is uniform Omega, positive
+    // spins the core up relative to the crust
+    double m_sigma_v = std::sqrt(2.);
+    double m_a_v = 3.0;
+
+    // initial data binary separation ratio, make > 1
+    double id_hsep_r = 2.0;
+
+    // grid stuff
     int m_nxg = 0;
     int m_nyg = 0;
     int m_ng  = 0;
     double m_dx = 0., m_dy = 0., m_xL = 0.;
     int flat(int i, int j) const { return j * m_nxg + i; }
+
+    // compact support bump, 1 at the centre and 0 outside rf = 1. shared by
+    // the density packet and the rotation profile, each with its own sigma
+    static double bump(double rf, double sigma) {
+        if (rf >= 1.) return 0.;
+        return std::exp(sigma*sigma*rf*rf/(rf*rf - 1.));
+    }
+
+    static double heaviside(double rf) {
+        if (rf >= 1.) return 0.;
+        return 1.;
+    }
+
 
     void integrate_M_ADM();
 };

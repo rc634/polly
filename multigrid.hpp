@@ -78,4 +78,19 @@ public:
 
     // sources
     void restrict_source_down(const Grid& fine, Grid& coarse);
+
+    // is the converged matter still physical? run on the finest grid at the end
+    // of every solve, since it needs psi. returns true if all is well
+    bool check_source();
+
+    // the ADM mass split into its matter and extrinsic curvature parts, each
+    // integrated over nested boxes, so the box size dependence is visible.
+    // returns the full box total, and leaves the three pieces below for main
+    // to write into params.dat
+    double check_mass_boxes(int n_boxes = 4);
+
+    // full box masses, set by check_mass_boxes at the end of every solve.
+    // m_M_ADM is the one downstream tools want: the matter term alone is short
+    // by the whole W contribution, which the spinning runs care about
+    double m_M_ADM = 0., m_M_rho = 0., m_M_W = 0.;
 };

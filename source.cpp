@@ -5,6 +5,8 @@
 #include <cmath>
 #include <stdexcept>
 #include <iomanip>
+#include <algorithm>
+#include <locale>
 
 #define _USE_MATH_DEFINES
 
@@ -30,21 +32,52 @@ void Source::init_bump(int nxg, int nyg, int ng,
             double y = yL + (j - ng + 0.5) * dy;
 
             double xf = x / m_width;
-            double yf = y / m_height;
+            double yf = y / m_height  - id_hsep_r;
+            // spheroidal radius
             double rf = std::sqrt(xf*xf + yf*yf);
-            double packet = 0.;
-            double GERRY = sqrt(3.);
 
-            if (xf*xf + yf*yf < 1.)
-                packet = exp(GERRY*GERRY*rf*rf/(rf*rf-1.));
+            // rigid rotation
+            // m_v[flat(i,j)]   = m_v_0;
 
-            switch (m_rotation_type) { // SPHEROIDAL RADIUS 
-                case ROT_FAST_CRUST: m_v[flat(i,j)] = m_v_0 * rf;        break;
-                case ROT_FAST_CORE:  m_v[flat(i,j)] = m_v_0 * (1. / rf); break;
-                default:             m_v[flat(i,j)] = m_v_0;              break;
-            }
+            // differential velocity
+            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * bump(rf, m_sigma_v)) / xf;
+            
+            // matter density // DONT UNCOMMENT!
+            m_rho[flat(i,j)] = m_rho_0 * bump(rf, m_sigma);
+        }
+    }
 
-            m_rho[flat(i,j)] = m_rho_0 * packet;
+    integrate_M_ADM();
+    std::cout << " - Source: bump  rho_0=" << m_rho_0
+              << "  omega_0=" << m_v_0 << "  M_ADM=" << m_M_ADM << "\n";
+}
+
+
+void Source::init_naka(int nxg, int nyg, int ng,
+                       double dx, double dy,
+                       double xL, double yL) {
+    m_nxg = nxg;
+    m_nyg = nyg;
+    m_ng  = ng;
+    m_dx  = dx;
+    m_dy  = dy;
+    m_xL  = xL;
+    m_v.assign(nxg * nyg, 0.);
+    m_rho.assign(nxg * nyg, 0.);
+
+    for (int j = 0; j < nyg; j++) {
+        for (int i = 0; i < nxg; i++) {
+            double x = xL + (i - ng + 0.5) * dx;
+            double y = yL + (j - ng + 0.5) * dy;
+
+            double xf = x / m_width;
+            double yf = y / m_height;
+            // spheroidal radius
+            double rf = std::sqrt(xf*xf + yf*yf);
+
+            // vortex velocity
+            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * heaviside(rf)) / xf;
+            m_rho[flat(i,j)] = m_rho_0 * heaviside(rf);
         }
     }
 
@@ -81,12 +114,7 @@ void Source::init_SJ(int nxg, int nyg, int ng,
                 packet = t*t*t*t;  // (1 - rf^2)^4
             }
 
-            switch (m_rotation_type) { // CYLINDER RADIUS 
-                case ROT_FAST_CRUST: m_v[flat(i,j)] = m_v_0 * xf; break;
-                case ROT_FAST_CORE:  m_v[flat(i,j)] = m_v_0 / xf; break;
-                default:             m_v[flat(i,j)] = m_v_0;      break;
-            }
-
+            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * bump(xf, m_sigma_v));
             m_rho[flat(i,j)] = m_rho_0 * packet;
         }
     }
@@ -240,6 +268,67 @@ double Source::max_v() const {
 
 
 // -----------------------------------------------------------------------
+// Sanity check — is the converged solution still physical?
+//
+// the rotating dust carries a factor
+//   denom = 1 - v_raw^2 x^2 psi^4 = 1 - v_phys^2
+// where v_phys = v_raw x psi^2 is the proper rotational velocity. it turns
+// negative as soon as the matter is driven superluminal, and takes the physical
+// density with it: with EFFECTIVE_RHO on it is rho_raw that flips, with it off
+// rho_eff does. either way the test is the same single condition, v_phys > 1,
+// so that is all this reports.
+//
+// the solver never sees any of it. the elliptic source it relaxes against stays
+// positive by construction, so the multigrid converges perfectly happily on data
+// that is already unphysical. psi only exists at the end, so the check only
+// means anything here.
+//
+// only cells that actually hold matter are counted. the vacuum carries the same
+// factor but multiplies it by zero density, so counting it would report the
+// maximum from somewhere the matter never reaches
+// -----------------------------------------------------------------------
+bool Source::sanity_check(int ng, const Field& psi_field) const {
+    int nx = m_nxg - 2*ng;
+    int ny = m_nyg - 2*ng;
+
+    double max_vphys = 0.;
+    double bad_x = 0., bad_y = 0.;
+    long   n_matter = 0, n_bad = 0;
+
+    for (int j = ng; j < ng + ny; j++) {
+        for (int i = ng; i < ng + nx; i++) {
+            // the bump has compact support, so this is the a,b matter ellipse
+            if (m_rho[flat(i,j)] <= 0.) continue;
+            n_matter++;
+
+            double x   = psi_field.get_x(i, j);
+            double psi = psi_field.get_data(i, j);
+
+            double vphys = std::fabs(get_v_raw(i, j, x, psi) * x * psi * psi);
+
+            if (vphys > max_vphys) {
+                max_vphys = vphys;
+                bad_x = x;
+                bad_y = psi_field.get_y(i, j);
+            }
+            if (vphys > 1.) n_bad++;
+        }
+    }
+
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "  SANITY  |v_phys| max = " << max_vphys
+              << std::setprecision(4)
+              << "  (psi^2 v r, at x = " << bad_x << ", y = " << bad_y << ")\n";
+    std::cout << std::defaultfloat;
+    std::cout << "  SANITY  superluminal cells = " << n_bad
+              << " of " << n_matter << " matter cells"
+              << (n_bad ? "   *** NOT PHYSICAL ***" : "") << "\n\n";
+
+    return n_bad == 0;
+}
+
+
+// -----------------------------------------------------------------------
 // Save2 — same format as Grid::save_state()
 // -
 
@@ -248,12 +337,22 @@ void Source::save(const std::string& out_dir, int ng,
     int nx = m_nxg - 2*ng;
     int ny = m_nyg - 2*ng;
 
-    std::ofstream f_rho_raw(out_dir + "/rho-raw.dat");
-    std::ofstream f_rho_eff(out_dir + "/rho-eff.dat");
-    std::ofstream f_src_psi(out_dir + "/source-psi.dat");
-    std::ofstream f_v_raw  (out_dir + "/v-raw.dat");
-    std::ofstream f_v_eff  (out_dir + "/v-eff.dat");
-    std::ofstream f_src_W  (out_dir + "/source-W.dat");
+    // the default stream buffer is a few KB and every << goes through
+    // locale-aware formatting. a 4MB buffer and the C locale between them
+    // roughly halve the time this takes, for identical output
+    std::vector<std::vector<char>> bufs(6, std::vector<char>(1 << 22));
+    std::ofstream f_rho_raw, f_rho_eff, f_src_psi, f_v_raw, f_v_eff, f_src_W;
+    {
+        std::ofstream* fs[6] = {&f_rho_raw, &f_rho_eff, &f_src_psi,
+                                &f_v_raw,   &f_v_eff,   &f_src_W};
+        const char* names[6] = {"/rho-raw.dat", "/rho-eff.dat", "/source-psi.dat",
+                                "/v-raw.dat",   "/v-eff.dat",   "/source-W.dat"};
+        for (int k = 0; k < 6; k++) {
+            fs[k]->rdbuf()->pubsetbuf(bufs[k].data(), bufs[k].size());
+            fs[k]->imbue(std::locale::classic());
+            fs[k]->open(out_dir + names[k]);
+        }
+    }
 
     // set precision on all
     for (auto* f : {&f_rho_raw, &f_rho_eff, &f_src_psi,
@@ -265,7 +364,10 @@ void Source::save(const std::string& out_dir, int ng,
             double x      = psi_field.get_x(i, j);
             double psi_ij = psi_field.get_data(i, j);
 
-            std::string sep = (i < ng + nx - 1) ? "," : "\n";
+            // a char, not a std::string: this line ran once per cell, and
+            // the heap allocation it used to do cost more than 3x the rest
+            // of the write put together
+            const char sep = (i < ng + nx - 1) ? ',' : '\n';
 
             f_rho_raw << get_rho_raw(i,j,x,psi_ij) << sep;
             f_rho_eff << get_rho_eff(i,j,x,psi_ij) << sep;

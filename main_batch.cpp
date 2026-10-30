@@ -22,7 +22,8 @@ struct RunConfig {
 // Format is one "key value" pair per line, so a reader is just
 //   while (f >> key >> value) ...
 // -----------------------------------------------------------------------
-static void save_run_params(const RunConfig& cfg, const Grid& g) {
+static void save_run_params(const RunConfig& cfg, const Grid& g,
+                            const Multigrid& mg) {
     std::string path = cfg.name + "/params.dat";
     std::ofstream f(path);
 
@@ -46,7 +47,12 @@ static void save_run_params(const RunConfig& cfg, const Grid& g) {
     f << "a "     << cfg.a     << "\n";   // height, y semi-axis
     f << "b "     << cfg.b     << "\n";   // width,  x semi-axis
     f << "ecc "   << ecc       << "\n";
-    f << "M_ADM " << g.m_source.m_M_ADM << "\n";
+    // the total, matter plus the W term. the matter piece on its own, which is
+    // all m_source.m_M_ADM knows about, is short by a few percent once the run
+    // is spinning, and that error propagates straight into every hoop ratio
+    f << "M_ADM "     << mg.m_M_ADM << "\n";
+    f << "M_ADM_rho " << mg.m_M_rho << "\n";
+    f << "M_ADM_W "   << mg.m_M_W   << "\n";
 
     // grid the .dat files live on (finest level, ghosts excluded)
     f << "nx " << g.nx   << "\n";
@@ -77,7 +83,7 @@ static void run(const RunConfig& cfg) {
     // mg.up_cycle(mg.p.res_tol);
     mg.v_solve(mg.p.res_tol);
     mg.fine_grid_ptr->save_state();
-    save_run_params(cfg, *mg.fine_grid_ptr);
+    save_run_params(cfg, *mg.fine_grid_ptr, mg);
 }
 
 int main() {
@@ -87,12 +93,12 @@ int main() {
     // -------------------------------------------------------
     // Parameter sweep — edit this list to change the batch
     // -------------------------------------------------------
-    const int n = 1;
+    const int n = 7;
     double a_bag[n];
     double b_bag[n];
     double a_pan[n];
     double b_pan[n];
-    double ecc_i[n] = {0.99};
+    double ecc_i[n] = {0.99,0.94,0.95,0.96,0.97,0.98,0.99};
     double spins[7] = {0.1, 0.3, 0.6, 1.0, 2.0, 4.0, 8.0};
     for (size_t i = 0; i < n; i++)
     {
@@ -110,41 +116,77 @@ int main() {
         a_bag[i] = pow(a_over_b,-2./3.);
     }
 
-    // e99 bag about 7.6
-    // e99 pan about 5.2
-    // e99 sph about 3.2
-    // const double rho_bag = 5.;
-    // const double rho_pan = 4.;
-    // const double rho_bag99 = 7.7;
-    // const double rho_pan99 = 5.3;
-    // const double rho_sph = 3.1;
-
     std::vector<RunConfig> runs = {
         // rho_0  v_0   a     b          name
+        // {   3.00,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-00" },
+        // {   3.02,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-02" }, 
+        // {   3.04,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-04" }, //no
+        // {   3.06,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-06" }, //yes
         // {   3.08,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-08" }, 
-        // {   3.10,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-10" },
-        // {   3.12,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-12" }, 
-        // {   3.14,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-14" }, 
-        // {   3.16,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-16" }, 
-        // {   3.18,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-18" }, 
-        // {   3.20,   0.0,  1.0,  1.0,  "batch/paper-sph/rho3-20" }, //comfortable horizon
-        {   5.0,   0.0,  1.0,  1.0,  "batch/paper-sph/rho5-0" }, 
-
-        // {   7.0,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-00" }, // no
-        // {   7.1,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-10" }, 
-        // {   7.2,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-20" }, 
-        // {   7.3,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-30" }, 
-        // {   7.4,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-40" }, 
-        // {   7.5,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-50" }, // yes
 
 
-        // {   4.5,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho4-50" }, //no
-        // {   4.6,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho4-60" }, 
-        // {   4.7,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho4-70" }, 
-        // {   4.8,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho4-80" }, 
-        // {   4.9,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho4-90" }, 
-        // {   5.0,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-00" }, //
+
+        // {   3.10,   0.0,  1.0,  1.0,  "batch/paper-diffrotsph/v00" },  
+        // {   3.10,   1.0,  1.0,  1.0,  "batch/paper-diffrotsph/v01" }, 
+        // {   3.10,   2.0,  1.0,  1.0,  "batch/paper-diffrotsph/v02" }, 
+        // {   3.10,   3.0,  1.0,  1.0,  "batch/paper-diffrotsph/v03" }, 
+        // {   3.10,   4.0,  1.0,  1.0,  "batch/paper-diffrotsph/v04" }, 
+        // {   3.10,   6.0,  1.0,  1.0,  "batch/paper-diffrotsph/v06" }, 
+        // {   3.10,   8.0,  1.0,  1.0,  "batch/paper-diffrotsph/v08" }, 
+        // {   3.10,   10.0,  1.0,  1.0,  "batch/paper-diffrotsph/v10" }, 
+        // {   3.10,   12.0,  1.0,  1.0,  "batch/paper-diffrotsph/v12" }, 
+        // {   3.10,   14.0,  1.0,  1.0,  "batch/paper-diffrotsph/v14" }, 
+        // {   3.10,   16.0,  1.0,  1.0,  "batch/paper-diffrotsph/v16" }, 
+
+        // {   4.0,   0.0,  1.0,  1.0,  "batch/paper-diffrotsph-HV/v0" },  
+        // {   4.0,   4.0,  1.0,  1.0,  "batch/paper-diffrotsph-HV/v4" }, 
+        // {   4.0,   8.0,  1.0,  1.0,  "batch/paper-diffrotsph-HV/v8" }, 
+        // {   5.0,   12.0,  1.0,  1.0,  "batch/paper-diffrotsph-HV/v12" }, 
+        // {   4.0,   16.0,  1.0,  1.0,  "batch/paper-diffrotsph-HV/v16" }, 
+
+
+        // {   5.10,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v00" },
+        // {   5.10,   0.5,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v05" }, 
+        // {   5.10,   1.0,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v10" }, 
+        // {   5.10,   1.5,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v15" }, 
+        // {   5.10,   2.0,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v20" }, 
+        // {   5.10,   2.5,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v25" }, 
+        // {   5.10,   5.0,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v50" }, 
+        // {   5.10,   7.5,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v75" }, 
+        // {   5.10,   10.0,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v100" }, 
+        // {   5.10,   12.5,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v125" },
+        // {   5.10,   14.6,  a_pan[0],  b_pan[0],  "batch/paper-diffrotpan/v146" },
+
+
+        // {   6.0,   20.0,  a_pan[0],  b_pan[0],  "batch/twist/test-anti" },
         
+        
+        // {   7.0,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v00" }, 
+        // {   7.0,   4.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v04" }, 
+        // {   7.0,   7.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v07" }, 
+        // {   7.0,   8.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v08" }, 
+        // {   7.0,   12.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v12" }, 
+        // {   7.0,   16.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v16" },
+        // {   7.0,   24.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v24" }, 
+        // {   7.0,   32.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v32" }, 
+        // {   7.0,   40.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v40" }, 
+        // {   7.0,   48.0,  a_bag[0],  b_bag[0],  "batch/paper-rigidrotbag/v48" }, 
+
+    
+        // {   6.00,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho6-00" }, //no
+        // {   6.20,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho6-20" },  
+        // {   6.40,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho6-40" }, 
+        // {   6.60,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho6-60" }, 
+        // {   6.80,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho6-80" }, // no
+        // {   7.00,   0.0,  a_bag[0],  b_bag[0],  "batch/paper-bag/rho7-00" }, // yes
+
+
+        // {   5.00,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-00" }, // no
+        // {   5.10,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-10" }, // yes
+        // {   5.20,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-20" }, 
+        // {   5.30,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-30" }, 
+        // {   5.40,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-40" }, 
+        // {   5.50,   0.0,  a_pan[0],  b_pan[0],  "batch/paper-pan/rho5-50" }, 
     };
 
     for (auto& cfg : runs)

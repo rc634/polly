@@ -3,6 +3,8 @@
 #include "grid.hpp"
 #include <iomanip> // for precision output
 #include <algorithm> // for std::min
+#include <locale>
+#include <vector>
 
 // for pi 
 #define _USE_MATH_DEFINES
@@ -43,9 +45,13 @@ void Grid::init(int i) {
     m_UR = 1.; // real dt = m_dt * m_UR
 
     // matter source stuff
-    // analytic: 
     // gets over-ridden if we read from file 
+
+    // smooth matter
     m_source.init_bump(nxg, nyg, ng, dx, dy, p.xL, p.yL);
+
+    // nakamura sharp matter
+    // m_source.init_naka(nxg, nyg, ng, dx, dy, p.xL, p.yL);
     
     // verbose
     std::cout << " - grid " << grid_n << " - N = " << nx << " x " << ny
@@ -148,6 +154,63 @@ double Grid::int_W() {
     return integral;
 }
 
+// the W contribution to the ADM mass over the box r <= Lx, z <= Ly. this is
+// the second term of
+//   M = 2 pi int dr dz r rho
+//        + (1/4) int dr dz r psi^-7 [ (dW/dr - W/r)^2 + (dW/dz)^2 ]
+// written with the same prefactors as that expression, then doubled at the end
+// for the reflection, rather than folding the two together into one constant.
+//
+// the 1/4 is the coefficient the same bracket carries in pde_operator - change
+// one and the other has to change with it. the bracket is kept as the square it
+// is rather than expanded, which holds its digits near the axis where dW/dr and
+// W/r both tend to the same constant
+double Grid::int_W_term(double Lx, double Ly) {
+    double total = 0.;
+    #pragma omp parallel for schedule(static) reduction(+:total)
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            double x = W.get_x(i,j);
+            if (x > Lx || W.get_y(i,j) > Ly) continue;
+
+            double a    = W.d1x(i,j) - W.get_data(i,j)/x;
+            double dWdy = W.d1y(i,j);
+
+            double pinv  = 1./psi.get_data(i,j);
+            double pinv2 = pinv*pinv;
+            double pinv4 = pinv2*pinv2;
+
+            total += pinv4*pinv2*pinv * (a*a + dWdy*dWdy) * x * dx * dy;
+        }
+    }
+
+    // the integral exactly as written, over the z >= 0 half of the domain
+    double half = 0.25 * total;
+
+    // doubled for the z reflection symmetry - the grid holds only z >= 0
+    return 2. * half;
+}
+
+// the matter contribution over the same box, the first term of the expression
+// above, handled the same way
+double Grid::int_rho_box(double Lx, double Ly) {
+    double total = 0.;
+    #pragma omp parallel for schedule(static) reduction(+:total)
+    for (int j = jmin; j < jmax; j++) {
+        for (int i = imin; i < imax; i++) {
+            double x = W.get_x(i,j);
+            if (x > Lx || W.get_y(i,j) > Ly) continue;
+            total += m_source.get_rho_eff(i, j, x, psi.get_data(i,j)) * x * dx * dy;
+        }
+    }
+
+    // the integral exactly as written, over the z >= 0 half of the domain
+    double half = 2. * M_PI * total;
+
+    // doubled for the z reflection symmetry, as Source::integrate_M_ADM does
+    return 2. * half;
+}
+
 double Grid::int_psim1() {
     double integral = 0.;
     for (int j = jmin; j < jmax; j++) {
@@ -188,7 +251,7 @@ void Grid::pde_operator(int i, int j, double& F_W, double& F_psi,
 
     // non-flat-laplacian terms from PDE's
     double geom_W   = Wij/x/x;
-    double geom_psi = - 0.5 * psiinv7 * (
+    double geom_psi = - 0.25 * psiinv7 * (
         dWdy*dWdy + dWdx*dWdx
         - 2.*dWdx*Wij/x + Wij*Wij/x/x
     );
@@ -284,8 +347,19 @@ void Grid::relax() {
 // choose the boundary type here 
 // this is a wrapper function which is alwayas called from outside 
 void Grid::fill_all_ghosts() {
+
+    // hard coded example black hole BC
     // fill_all_ghosts_ADM();
-    fill_all_ghosts_robin();
+
+    // exactly one of these may run: each writes every ghost cell, so calling
+    // both would just leave whichever went last
+    if (m_antisymmW_BC) {
+        // antisymm W about the equator, sym psi
+        fill_all_ghosts_antisymmW();
+    } else {
+        // symmetric W and psi
+        fill_all_ghosts_robin();
+    }
 }
 
 // mixed type boundary conditions based on asymptotic expansion
@@ -398,6 +472,132 @@ void Grid::fill_all_ghosts_robin() {
         psi.set_new_data(psi4, i, j4);
     }
 
+}
+
+// As fill_all_ghosts_robin, but with W ODD about the equator instead of even.
+//
+// Reflecting W antisymmetrically across y = 0 forces W(x,0) = 0, so the net
+// angular momentum vanishes and the l = 1 far field W ~ J sin(th) / R^2 is not
+// available - it is even about the equator. The phi component of an
+// axisymmetric divergence free field expands in P_l^1(cos th) / R^(l+1), and
+// the leading term odd about the equator is l = 2, P_2^1 = -3 cos(th) sin(th):
+//
+//      W ~ A sin(th) cos(th) / R^3  =  A x y / R^5
+//
+// Differentiating that gives the two mixed conditions used below,
+//
+//      dW/dx / W = (y^2 - 4 x^2) / ( x (x^2 + y^2) )
+//      dW/dy / W = (x^2 - 4 y^2) / ( y (x^2 + y^2) )
+//
+// against the l = 1 forms (y^2 - 2x^2)/(x(x^2+y^2)) and -3y/(x^2+y^2) that
+// fill_all_ghosts_robin uses. psi is untouched throughout - it stays even about
+// both the axis and the equator, and keeps its 1 + M/2R outer condition.
+void Grid::fill_all_ghosts_antisymmW() {
+    // two ghosts thickness hard coded!
+
+    // warning only one thickness of ghost computed for outer!
+    // don't use 4th order stencils unless we fix that
+
+    // loop left boundary -- symmetric psi, antisymmetric W
+    // unchanged: this is parity about the AXIS, which the equator parity does
+    // not touch
+    for (int j = 0; j < nyg; j++) {
+        W.set_data(-W.get_data(3,j),0,j);
+        W.set_data(-W.get_data(2,j),1,j);
+        W.set_new_data(-W.get_new_data(3,j),0,j);
+        W.set_new_data(-W.get_new_data(2,j),1,j);
+        psi.set_data(psi.get_data(3,j),0,j);
+        psi.set_data(psi.get_data(2,j),1,j);
+        psi.set_new_data(psi.get_new_data(3,j),0,j);
+        psi.set_new_data(psi.get_new_data(2,j),1,j);
+    }
+
+    // loop bottom boundary -- symmetric psi, ANTIsymmetric W
+    // the one sign flip that defines this routine
+    for (int i = 0; i < nxg; i++) {
+        W.set_data(-W.get_data(i,2), i, 1);
+        W.set_data(-W.get_data(i,3), i, 0);
+        W.set_new_data(-W.get_new_data(i,2), i, 1);
+        W.set_new_data(-W.get_new_data(i,3), i, 0);
+        psi.set_data(psi.get_data(i,2), i, 1);
+        psi.set_data(psi.get_data(i,3), i, 0);
+        psi.set_new_data(psi.get_new_data(i,2), i, 1);
+        psi.set_new_data(psi.get_new_data(i,3), i, 0);
+    }
+
+    // outer boundaries
+
+    // psi ~ 1 + M/2R   R is spherical radius        (as in the l = 1 routine)
+    // W   ~ A sin(th) cos(th) / R^3                 (l = 2, see above)
+
+    double x2 = 0., y2 = 0., x3 = 0., y3 = 0.;
+    double psi1 = 1., psi2 = 1., psi3 = 1., psi4 = 1.;
+    double W1 = 0., W2 = 0., W3 = 0., W4 = 0.;
+    int i4 = nxg-1, i3 = nxg-2, i2 = nxg-3, i1 = nxg-4;
+    int j4 = nyg-1, j3 = nyg-2, j2 = nyg-3, j1 = nyg-4;
+
+    // loop right boundary
+    //  - x const, partial x calculated
+    for (int j = 0; j < nyg; j++) {
+        x2 = W.get_x(i2,j);
+        y2 = W.get_y(i2,j);
+        x3 = W.get_x(i3,j);
+        y3 = W.get_y(i3,j);
+
+        psi1 = psi.get_data(i1,j);
+        psi2 = psi.get_data(i2,j);
+        psi3 = psi1 - 2. * dx * x2 * (psi2-1.) / (x2*x2 + y2*y2);
+        psi4 = psi2 - 2. * dx * x3 * (psi3-1.) / (x3*x3 + y3*y3);
+
+        W1 = W.get_data(i1,j);
+        W2 = W.get_data(i2,j);
+        // the l = 1 routine has (y^2 - 2x^2) here; l = 2 gives (y^2 - 4x^2)
+        W3 = W1 + 2. * dx * (y2*y2 - 4.*x2*x2) * W2 / (y2*y2*x2 + x2*x2*x2);
+        W4 = W2 + 2. * dx * (y3*y3 - 4.*x3*x3) * W3 / (y3*y3*x3 + x3*x3*x3);
+
+        // inner ghost
+        W.set_data(W3, i3, j);
+        W.set_new_data(W3, i3, j);
+        psi.set_data(psi3, i3, j);
+        psi.set_new_data(psi3, i3, j);
+        // outer ghost
+        W.set_data(W4, i4, j);
+        W.set_new_data(W4, i4, j);
+        psi.set_data(psi4, i4, j);
+        psi.set_new_data(psi4, i4, j);
+    }
+
+    // loop top boundary
+    //  - y const, partial y calculated
+    for (int i = 0; i < nxg; i++) {
+        x2 = W.get_x(i,j2);
+        y2 = W.get_y(i,j2);
+        x3 = W.get_x(i,j3);
+        y3 = W.get_y(i,j3);
+
+        psi1 = psi.get_data(i,j1);
+        psi2 = psi.get_data(i,j2);
+        psi3 = psi1 - 2. * dy * y2 * (psi2-1.) / (x2*x2 + y2*y2);
+        psi4 = psi2 - 2. * dy * y3 * (psi3-1.) / (x3*x3 + y3*y3);
+
+        W1 = W.get_data(i,j1);
+        W2 = W.get_data(i,j2);
+        // the l = 1 routine has -3 y / R^2 here; l = 2 gives (x^2 - 4y^2)/(y R^2).
+        // y is O(yU) on this boundary, never near zero, so the 1/y is safe
+        W3 = W1 + 2. * dy * (x2*x2 - 4.*y2*y2) * W2 / (y2 * (x2*x2 + y2*y2));
+        W4 = W2 + 2. * dy * (x3*x3 - 4.*y3*y3) * W3 / (y3 * (x3*x3 + y3*y3));
+
+        // inner ghost
+        W.set_data(W3, i, j3);
+        W.set_new_data(W3, i, j3);
+        psi.set_data(psi3, i, j3);
+        psi.set_new_data(psi3, i, j3);
+        // outer ghost
+        W.set_data(W4, i, j4);
+        W.set_new_data(W4, i, j4);
+        psi.set_data(psi4, i, j4);
+        psi.set_new_data(psi4, i, j4);
+    }
 }
 
 // Dirichlet outer BC for psi using precomputed ADM mass.
@@ -573,9 +773,19 @@ void Grid::save_data(const std::string& filename) {
 
 void Grid::save_state() {
     std::string path1 = p.out_dir + "/W.dat";
-    std::ofstream file1(path1);
     std::string path2 = p.out_dir + "/psi.dat";
-    std::ofstream file2(path2);
+
+    // big buffers and the C locale, set before open. the default buffer is a
+    // few KB and every << otherwise pays for locale-aware formatting, which
+    // between them is most of the cost of writing these files
+    std::vector<char> buf1(1 << 23), buf2(1 << 23);
+    std::ofstream file1, file2;
+    file1.rdbuf()->pubsetbuf(buf1.data(), buf1.size());
+    file2.rdbuf()->pubsetbuf(buf2.data(), buf2.size());
+    file1.imbue(std::locale::classic());
+    file2.imbue(std::locale::classic());
+    file1.open(path1);
+    file2.open(path2);
 
     if (!file1) {
         std::cerr << "Error: could not open file " << path1 << "\n";

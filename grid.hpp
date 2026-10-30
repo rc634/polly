@@ -84,6 +84,12 @@ public:
     double int_W();
     double int_psim1();
 
+    // the two pieces of the ADM mass, each integrated over the box
+    // r <= Lx, z <= Ly so the box size dependence can be watched.
+    // see Multigrid::check_mass_boxes for where the prefactors come from
+    double int_W_term(double Lx, double Ly);   // the extrinsic curvature part
+    double int_rho_box(double Lx, double Ly);  // the matter part
+
     // PDE operator F(u) at one live cell, without tau
     void pde_operator(int i, int j, double& F_W, double& F_psi,
                       double& src_W, double& src_psi);
@@ -94,11 +100,19 @@ public:
     // parabolic diffusion type relaxation
     void relax();
 
+    // true  : W is ODD about the equator, so net J = 0 and the far field leads
+    //         with the l = 2 term  W ~ A sin(th) cos(th) / R^3
+    // false : W is EVEN about the equator, the usual l = 1 term
+    //         W ~ J sin(th) / R^2
+    // public so a run can pick its parity before the first solve
+    bool m_antisymmW_BC = false;
+
     // exterior call routine - selectes which private function to call
     void fill_all_ghosts();
 private :
     // interior precise BC functions 
     void fill_all_ghosts_robin();
+    void fill_all_ghosts_antisymmW();
     void fill_all_ghosts_ADM();
     void fill_all_ghosts_dirichlet();
 public :

@@ -10,7 +10,7 @@ struct Params {
 
     // convergence tolerance on the RELATIVE RESIDUAL ||r|| / ||src||
     // independent of both resolution and dt
-    double res_tol = 1e-10;   // 10e-8
+    double res_tol = 1e-9;   // 10e-8
 
     // number of 4th order stencil steps to do near end for fine resolution?
     double iter = 256; // relaxation steps after/before prolongation/restriction
