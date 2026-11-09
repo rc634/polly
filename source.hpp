@@ -93,10 +93,14 @@ private:
     double m_width  = 0.5; // sqrt(2.);
 
     // rotation stuff
-    // v = (v_0/x_f) (1 + a_v * bump(sigma_v)). a_v = 0 is uniform Omega, positive
-    // spins the core up relative to the crust
+    // v = (v_0/(x_f + eps_v)) (1 + a_v * bump(sigma_v)). a_v = 0 is uniform Omega,
+    // positive spins the core up relative to the crust
     double m_sigma_v = std::sqrt(2.);
     double m_a_v = 3.0;
+    // regulator on the 1/x_f profile, so the linear velocity Omega x goes to zero
+    // on the axis instead of to a constant. in units of the width, and far below
+    // the finest dx/2, so the gridded data only moves at the 1e-8 level
+    double m_eps_v = 1e-10;
 
     // initial data binary separation ratio, make > 1
     double id_hsep_r = 2.0;

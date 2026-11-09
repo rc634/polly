@@ -40,7 +40,11 @@ void Source::init_bump(int nxg, int nyg, int ng,
             // m_v[flat(i,j)]   = m_v_0;
 
             // differential velocity
-            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * bump(rf, m_sigma_v)) / xf;
+            // Omega ~ 1/(x_f + eps_v) rather than 1/x_f, so the linear velocity
+            // Omega x goes to zero on the axis instead of to a constant. eps_v
+            // is far below the first cell at dx/2, so the gridded data only
+            // moves at the 1e-8 level (J_ADM by 3e-10 on paper-diffrotsph-HV/v12)
+            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * bump(rf, m_sigma_v)) / (xf + m_eps_v);
             
             // matter density // DONT UNCOMMENT!
             m_rho[flat(i,j)] = m_rho_0 * bump(rf, m_sigma);
@@ -76,7 +80,8 @@ void Source::init_naka(int nxg, int nyg, int ng,
             double rf = std::sqrt(xf*xf + yf*yf);
 
             // vortex velocity
-            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * heaviside(rf)) / xf;
+            // same eps_v regulator as init_bump, so Omega x vanishes on the axis
+            m_v[flat(i,j)]   = m_v_0 * (1. + m_a_v * heaviside(rf)) / (xf + m_eps_v);
             m_rho[flat(i,j)] = m_rho_0 * heaviside(rf);
         }
     }
